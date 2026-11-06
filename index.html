@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <title>OnKey</title>
+  <meta name="theme-color" content="#0b0f1a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="OnKey">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <header class="bar">
+    <div class="brand">On<span>Key</span></div>
+    <div id="micBadge" class="mic-badge" hidden><span class="dot"></span>Mic on</div>
+    <div class="spacer"></div>
+    <button id="toneBtn" class="btn ghost">Play A3</button>
+    <button id="micBtn" class="btn primary">Start mic</button>
+  </header>
+
+  <main class="stage">
+    <aside class="readout">
+      <div id="noteName" class="note">–</div>
+      <div id="cents" class="cents">&nbsp;</div>
+      <div id="hz" class="hz">&nbsp;</div>
+      <div class="meter"><div id="level" class="meter-fill"></div></div>
+    </aside>
+    <div class="graph-wrap">
+      <canvas id="graph"></canvas>
+      <div id="hint" class="hint">Tap <b>Start mic</b>, then sing or hum a note.</div>
+    </div>
+  </main>
+
+  <footer class="foot">
+    <span id="device">Microphone off. Nothing is recorded or sent anywhere.</span>
+    <span id="silentNote">No sound from “Play A3”? Check the silent switch on the side of your iPhone.</span>
+  </footer>
+
+  <div id="rotate" class="rotate">Turn your phone sideways for the best view.</div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

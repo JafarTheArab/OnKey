@@ -1,0 +1,4 @@
+# Tests
+Run from the `onkey` folder:
+- `node tests/pitch.test.mjs`: pitch detector on synthetic voices (on pitch, flat, sharp, low, high, quiet, slides, octave jump, silence).
+- `node tests/make-wav.mjs`, then serve the folder on port 8765 (`python3 -m http.server 8765`) and run `node tests/e2e.cjs`: full page in Chromium with a fake mic; screenshots go to `tests/out/`.

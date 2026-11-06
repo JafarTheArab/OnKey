@@ -1,0 +1,19 @@
+const { chromium } = require('playwright');
+(async () => {
+  const b = await chromium.launch({ args: ['--use-fake-ui-for-media-stream','--use-fake-device-for-media-stream','--use-file-for-fake-audio-capture=' + __dirname + '/out/sing.wav','--autoplay-policy=no-user-gesture-required'] });
+  const ctx = await b.newContext({ viewport: { width: 844, height: 390 }, deviceScaleFactor: 2, permissions: ['microphone'] });
+  const p = await ctx.newPage(); const errs = [];
+  p.on('pageerror', e => errs.push(e.message)); p.on('console', m => m.type()==='error' && errs.push(m.text()));
+  await p.goto('http://localhost:8765/');
+  await p.screenshot({ path: __dirname + '/out/shot-idle.png' });
+  await p.click('#micBtn');
+  await p.waitForTimeout(6600);
+  await p.screenshot({ path: __dirname + '/out/shot-singing.png' });
+  const h = await p.evaluate(() => window.__onkey.history.filter(x => x.midi !== null).map(x => x.midi)); const seq=[]; for (const m of h){const r=Math.round(m); if(seq[seq.length-1]!==r) seq.push(r);} console.log("note sequence:", seq.join(" "));
+  const badge = await p.isVisible('#micBadge');
+  await p.click('#micBtn');
+  const badgeAfter = await p.isVisible('#micBadge');
+  const live = await p.evaluate(() => 0);
+  console.log({ voicedFrames: h.length, min: Math.min(...h).toFixed(1), max: Math.max(...h).toFixed(1), badgeWhileOn: badge, badgeAfterStop: badgeAfter, errs });
+  await b.close();
+})();

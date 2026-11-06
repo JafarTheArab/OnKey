@@ -1,0 +1,9 @@
+# Static site: no build step. Netlify publishes this folder as-is.
+[build]
+  publish = "."
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Permissions-Policy = "microphone=(self)"
+    Cache-Control = "no-cache"
