@@ -20,6 +20,7 @@
     <div id="micBadge" class="mic-badge" hidden><span class="dot"></span>Mic on</div>
     <div class="spacer"></div>
     <button id="toneBtn" class="btn ghost">Play A3</button>
+    <button id="tone2Btn" class="btn ghost">Backup sound</button>
     <button id="micBtn" class="btn primary">Start mic</button>
   </header>
 
@@ -33,12 +34,13 @@
     <div class="graph-wrap">
       <canvas id="graph"></canvas>
       <div id="hint" class="hint">Tap <b>Start mic</b>, then sing or hum a note.</div>
+      <div id="report" class="report" hidden></div>
     </div>
   </main>
 
   <footer class="foot">
     <span id="device">Microphone off. Nothing is recorded or sent anywhere.</span>
-    <span id="silentNote">No sound from “Play A3”? Check the silent switch on the side of your iPhone.</span>
+    <span id="soundState">Sound: not started yet</span>
   </footer>
 
   <div id="rotate" class="rotate">Turn your phone sideways for the best view.</div>

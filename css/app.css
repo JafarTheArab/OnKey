@@ -67,3 +67,7 @@ body {
   .meter { display: none; }
   .foot { flex-direction: column; padding-bottom: 60px; }
 }
+.report { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); max-width: 80%;
+  background: rgba(11,15,26,.92); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px;
+  font-size: 15px; text-align: center; }
+.report b { color: var(--voice); }

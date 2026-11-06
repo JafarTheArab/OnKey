@@ -42,7 +42,7 @@ export function yin(buf, sampleRate, { minFreq = 60, maxFreq = 1100, threshold =
     // No dip under threshold: take global min but only if reasonably periodic
     let best = minLag;
     for (let t = minLag; t <= maxLag; t++) if (d[t] < d[best]) best = t;
-    if (d[best] > 0.3) return null;
+    if (d[best] > Math.max(0.3, threshold + 0.15)) return null;
     tau = best;
   }
   // Parabolic interpolation
@@ -79,11 +79,17 @@ export class PitchTracker {
   feed(buf) {
     const level = rms(buf);
     const gate = Math.max(this.quiet ? 0.0015 : 0.003, this.noiseFloor * 2.5);
+    // Hysteresis: once a note is going, keep following it through rough or softer moments
+    const holding = this.smoothed !== null && this.silentFrames < 4;
+    const needLevel = holding ? gate * 0.6 : gate;
+    const needClarity = holding ? 0.55 : 0.72;
 
-    let midi = null, freq = null, periodic = false;
-    if (level > gate) {
-      const r = yin(buf, this.sampleRate);
-      periodic = !!(r && r.clarity > 0.75);
+    let midi = null, freq = null, periodic = false, reason = null;
+    if (level <= needLevel) reason = 'quiet';
+    else {
+      const r = yin(buf, this.sampleRate, holding ? { threshold: 0.25 } : undefined);
+      periodic = !!(r && r.clarity > needClarity);
+      if (!periodic) reason = 'unclear';
       if (periodic) {
         freq = r.freq;
         midi = freqToMidi(freq);
@@ -115,7 +121,7 @@ export class PitchTracker {
     if (midi === null) {
       this.silentFrames++;
       if (this.silentFrames > 4) { this.recent = []; this.smoothed = null; }
-      return { midi: null, freq: null, level, gate, voiced: false };
+      return { midi: null, freq: null, level, gate, voiced: false, reason };
     }
     this.silentFrames = 0;
     this.recent.push(midi);

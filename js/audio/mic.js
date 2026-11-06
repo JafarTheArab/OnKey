@@ -6,16 +6,36 @@
 import { PitchTracker } from './pitch.js';
 
 let ctx = null;
+let unlocked = false;
+
+export function setSessionType(type) {
+  try { if (navigator.audioSession && navigator.audioSession.type !== type) navigator.audioSession.type = type; } catch (_) {}
+}
+
+// A tiny silent WAV. Playing it through an <audio> element once, inside a tap, moves iOS
+// into "media playback" mode so web audio is audible (and not muted by the silent switch).
+const SILENT_WAV = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAgLsAAAB3AQACABAAZGF0YQQAAAAAAAAA';
 
 /** Must be called synchronously inside a tap handler (iOS Safari requirement). */
 export function unlockAudio() {
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (ctx && ctx.state === 'closed') ctx = null;
   if (!ctx) {
-    const AC = window.AudioContext || window.webkitAudioContext;
     ctx = new AC({ latencyHint: 'interactive' });
+    ctx.addEventListener('statechange', () => window.dispatchEvent(new Event('onkey-audiostate')));
   }
-  if (ctx.state !== 'running') ctx.resume();
+  if (ctx.state !== 'running') ctx.resume().catch(() => {});
+  if (!unlocked) {
+    unlocked = true;
+    try { const a = new Audio(SILENT_WAV); a.setAttribute('playsinline', ''); a.play().catch(() => {}); } catch (_) {}
+    // Also play one silent sample through web audio, inside the tap
+    const b = ctx.createBuffer(1, 1, ctx.sampleRate), src = ctx.createBufferSource();
+    src.buffer = b; src.connect(ctx.destination); src.start(0);
+  }
   return ctx;
 }
+
+export const audioState = () => (ctx ? ctx.state : 'not started');
 
 export class Mic {
   constructor({ onFrame, onStateChange }) {
@@ -32,11 +52,9 @@ export class Mic {
 
   /** Call from a tap handler. */
   async start() {
+    // Tell iOS we want to play and record (keeps output on earbuds/speaker, not earpiece)
+    setSessionType('play-and-record');
     const ac = unlockAudio(); // synchronous part, before any await
-    try {
-      // Tell iOS we want to play and record (keeps output on earbuds/speaker, not earpiece)
-      if (navigator.audioSession) navigator.audioSession.type = 'play-and-record';
-    } catch (_) { /* not supported */ }
 
     this.stream = await navigator.mediaDevices.getUserMedia({
       audio: {
@@ -78,7 +96,7 @@ export class Mic {
     if (this.stream) this.stream.getTracks().forEach((t) => t.stop()); // releases the mic
     this.stream = null;
     this.on = false;
-    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (_) {}
+    setSessionType('playback');
     this.onStateChange(false, reason);
   }
 }
