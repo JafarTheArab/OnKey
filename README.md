@@ -1,5 +1,5 @@
 # OnKey
-Singing practice web app (iPhone, landscape). Static site, no build step, no server.
+Singing practice web app (iPhone, landscape). Static site, no build step, no server. Hosted on GitHub Pages: https://jafarthearab.github.io/OnKey/
 
 - `js/audio/`: microphone lifecycle (privacy rules) and YIN pitch detection (`pitch.js` has no DOM, so it's reusable)
 - `js/music/`: note naming helpers
