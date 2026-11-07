@@ -69,7 +69,7 @@ export class PitchTracker {
   constructor({ sampleRate, quiet = false } = {}) {
     this.sampleRate = sampleRate;
     this.quiet = quiet;
-    this.noiseFloor = 0.002;
+    this.noiseFloor = 0.0003; // start by assuming a quiet room; it adapts upward if it isn't
     this.recent = []; // last raw midi values for median
     this.smoothed = null;
     this.silentFrames = 0;
@@ -78,18 +78,22 @@ export class PitchTracker {
 
   feed(buf) {
     const level = rms(buf);
-    const gate = Math.max(this.quiet ? 0.0015 : 0.003, this.noiseFloor * 2.5);
+    // iPhone mics with auto-gain off deliver a voice at only ~0.007 RMS, so the fixed floor must be low;
+    // the adaptive part (room noise x 2.5) does the real work.
+    const gate = Math.max(this.quiet ? 0.0005 : 0.0008, this.noiseFloor * 2.5);
     // Hysteresis: once a note is going, keep following it through rough or softer moments
     const holding = this.smoothed !== null && this.silentFrames < 4;
     const needLevel = holding ? gate * 0.6 : gate;
     const needClarity = holding ? 0.55 : 0.72;
 
     let midi = null, freq = null, periodic = false, reason = null;
-    this.raw = null;
+    // Always look for a note (unless it's near-silent), so we know whether this frame is
+    // musical. The noise estimate below must never learn from a voice, however quiet.
+    const r = level > 0.0002 ? yin(buf, this.sampleRate, holding ? { threshold: 0.25 } : undefined) : null;
+    this.raw = r; // what the detector found, even if rejected (shown on screen for diagnosis)
+    const musical = !!(r && r.clarity > 0.6);
     if (level <= needLevel) reason = 'quiet';
     else {
-      const r = yin(buf, this.sampleRate, holding ? { threshold: 0.25 } : undefined);
-      this.raw = r; // what the detector found, even if rejected (shown on screen for diagnosis)
       periodic = !!(r && r.clarity > needClarity);
       if (!periodic) reason = 'unclear';
       if (periodic) {
@@ -113,9 +117,9 @@ export class PitchTracker {
         }
       }
     }
-    // Adaptive noise floor: learns only from frames without a clear pitch (room noise),
-    // falls quickly, rises slowly, so loud singing never raises the gate.
-    if (!periodic) {
+    // Adaptive noise floor: learns only from frames with no musical note in them (room noise),
+    // falls quickly, rises slowly, so singing (loud or soft) never raises the gate.
+    if (!musical) {
       if (level < this.noiseFloor) this.noiseFloor = this.noiseFloor * 0.8 + level * 0.2;
       else this.noiseFloor = Math.min(0.05, this.noiseFloor * 0.99 + level * 0.01);
     }

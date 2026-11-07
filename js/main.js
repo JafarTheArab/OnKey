@@ -42,7 +42,9 @@ const mic = new Mic({
       } else if (lastVoicedT) gapReasons.push(r.reason);
     }
     while (history.length && r.t - history[0].t > WINDOW_MS + 500) history.shift();
-    levelEl.style.width = Math.min(100, (r.level / 0.1) * 100) + '%';
+    // Volume bar on a loudness scale, so a quiet iPhone mic still shows movement
+    const db = 20 * Math.log10(Math.max(r.level, 1e-6));
+    levelEl.style.width = Math.max(0, Math.min(100, ((db + 70) / 50) * 100)) + '%';
     // Diagnosis readout: what the detector found, even if it rejected it (refreshed ~6x a second)
     if (r.t - (rawEl._t || 0) > 160) {
       rawEl._t = r.t;
@@ -56,9 +58,11 @@ const mic = new Mic({
       const avg = recent.reduce((a, b) => a + b, 0) / recent.length;
       const c = centsOff(avg);
       noteEl.textContent = midiName(avg);
-      centsEl.textContent = c === 0 ? 'right on' : (c > 0 ? `${c} cent${c === 1 ? '' : 's'} sharp` : `${-c} cent${c === -1 ? '' : 's'} flat`);
-      centsEl.className = 'cents ' + (Math.abs(c) <= 10 ? 'ok' : c > 0 ? 'sharp' : 'flat');
-      hzEl.textContent = r.freq.toFixed(1) + ' Hz';
+      // Plain words first; the exact amount underneath (100% of a step = one piano key)
+      const a = Math.abs(c);
+      centsEl.textContent = a <= 10 ? 'On it ✓' : a <= 25 ? (c > 0 ? 'A bit sharp ↑' : 'A bit flat ↓') : (c > 0 ? 'Sharp ↑' : 'Flat ↓');
+      centsEl.className = 'cents ' + (a <= 10 ? 'ok' : c > 0 ? 'sharp' : 'flat');
+      hzEl.textContent = a <= 10 ? 'right on the note' : `${a}% of a step ${c > 0 ? 'high' : 'low'}`;
       center += (r.midi - center) * 0.04; // gently follow the voice
     }
   },
