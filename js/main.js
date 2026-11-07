@@ -1,4 +1,5 @@
-import { Mic, unlockAudio, audioState, setSessionType } from './audio/mic.js';
+import { Mic } from './audio/mic.js';
+import { unlockAudio, audioState, setSessionType, output, routeName, sessionType } from './audio/engine.js';
 import { midiName, centsOff, isNatural } from './music/notes.js';
 
 const $ = (id) => document.getElementById(id);
@@ -19,6 +20,12 @@ let lastVoicedT = 0, gapReasons = [];
 function resetStats() { stats = { voiced: 0, gaps: 0, quiet: 0, unclear: 0 }; gapReasons = []; lastVoicedT = 0; }
 
 const mic = new Mic({
+  onWarn(kind) {
+    if (kind === 'nodata') {
+      hint.textContent = 'The mic is on, but no sound is reaching OnKey. Tap Stop mic, then Start mic again.';
+      hint.hidden = false;
+    }
+  },
   onFrame(r) {
     history.push({ t: r.t, midi: r.midi });
     if (stats) {
@@ -56,9 +63,11 @@ const mic = new Mic({
       resetStats();
       deviceEl.textContent = `Listening on: ${mic.deviceLabel || 'microphone'} · ${mic.sampleRate} Hz · on-device only`;
     } else {
-      deviceEl.textContent = reason === 'background'
-        ? 'Mic turned off because OnKey went to the background.'
-        : 'Microphone off. Nothing is recorded or sent anywhere.';
+      deviceEl.textContent = {
+        background: 'Mic turned off because OnKey went to the background.',
+        error: 'Mic turned off because something went wrong (see the message above).',
+        ended: 'Mic turned off by the iPhone (another app or a call may have taken it).',
+      }[reason] || 'Microphone off. Nothing is recorded or sent anywhere.';
       noteEl.textContent = '–'; centsEl.innerHTML = '&nbsp;'; hzEl.innerHTML = '&nbsp;';
       levelEl.style.width = '0';
       if (stats && stats.voiced > 15) {
@@ -82,18 +91,20 @@ micBtn.addEventListener('click', async () => {
     hint.hidden = false;
     hint.textContent = e.name === 'NotAllowedError'
       ? 'Microphone permission was denied. In Settings › Safari › Microphone, allow access, then try again.'
-      : 'Could not start the microphone: ' + e.message;
+      : /stuck/.test(e.message)
+        ? 'The iPhone’s sound didn’t start, so I turned the mic back off. Tap Start mic again.'
+        : 'Could not start the microphone: ' + e.message;
   }
 });
 
 function showSound(extra = '') {
-  soundEl.textContent = 'Sound: ' + audioState() + (navigator.audioSession ? ' · ' + navigator.audioSession.type : '') + extra;
+  soundEl.textContent = 'Sound: ' + audioState() + ' · ' + routeName() + (sessionType() ? ' · ' + sessionType() : '') + extra;
 }
 window.addEventListener('onkey-audiostate', () => showSound());
 
 toneBtn.addEventListener('click', () => {
   if (!mic.on) setSessionType('playback');
-  const ac = unlockAudio(); // synchronous, inside the tap
+  const ac = unlockAudio(); // synchronous, inside the tap (rebuilds the engine if the mode changed)
   const play = () => {
     const t0 = ac.currentTime + 0.05;
     const osc = ac.createOscillator(), gain = ac.createGain();
@@ -103,7 +114,7 @@ toneBtn.addEventListener('click', () => {
     gain.gain.linearRampToValueAtTime(0.25, t0 + 0.05);
     gain.gain.setValueAtTime(0.25, t0 + 1.3);
     gain.gain.linearRampToValueAtTime(0, t0 + 1.6);
-    osc.connect(gain).connect(ac.destination);
+    osc.connect(gain).connect(output());
     osc.start(t0); osc.stop(t0 + 1.7);
   };
   if (ac.state === 'running') play();

@@ -1,46 +1,17 @@
 // Microphone lifecycle with privacy rules:
 // - only on while explicitly started
-// - turns off when the app goes to the background
+// - the on-screen indicator turns on the moment the iPhone hands over the mic
+// - turns off when the app goes to the background, or if anything goes wrong
 // - audio is analysed in memory only; nothing is recorded or sent anywhere
 
 import { PitchTracker } from './pitch.js';
-
-let ctx = null;
-let unlocked = false;
-
-export function setSessionType(type) {
-  try { if (navigator.audioSession && navigator.audioSession.type !== type) navigator.audioSession.type = type; } catch (_) {}
-}
-
-// A tiny silent WAV. Playing it through an <audio> element once, inside a tap, moves iOS
-// into "media playback" mode so web audio is audible (and not muted by the silent switch).
-const SILENT_WAV = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAgLsAAAB3AQACABAAZGF0YQQAAAAAAAAA';
-
-/** Must be called synchronously inside a tap handler (iOS Safari requirement). */
-export function unlockAudio() {
-  const AC = window.AudioContext || window.webkitAudioContext;
-  if (ctx && ctx.state === 'closed') ctx = null;
-  if (!ctx) {
-    ctx = new AC({ latencyHint: 'interactive' });
-    ctx.addEventListener('statechange', () => window.dispatchEvent(new Event('onkey-audiostate')));
-  }
-  if (ctx.state !== 'running') ctx.resume().catch(() => {});
-  if (!unlocked) {
-    unlocked = true;
-    try { const a = new Audio(SILENT_WAV); a.setAttribute('playsinline', ''); a.play().catch(() => {}); } catch (_) {}
-    // Also play one silent sample through web audio, inside the tap
-    const b = ctx.createBuffer(1, 1, ctx.sampleRate), src = ctx.createBufferSource();
-    src.buffer = b; src.connect(ctx.destination); src.start(0);
-  }
-  return ctx;
-}
-
-export const audioState = () => (ctx ? ctx.state : 'not started');
+import { unlockAudio, waitRunning, setRoute, setSessionType } from './engine.js';
 
 export class Mic {
-  constructor({ onFrame, onStateChange }) {
+  constructor({ onFrame, onStateChange, onWarn }) {
     this.onFrame = onFrame;
     this.onStateChange = onStateChange || (() => {});
+    this.onWarn = onWarn || (() => {});
     this.stream = null;
     this.timer = null;
     this.on = false;
@@ -50,53 +21,72 @@ export class Mic {
     window.addEventListener('pagehide', () => this.stop('background'));
   }
 
-  /** Call from a tap handler. */
+  /** Call from a tap handler. Everything before the first await runs inside the tap. */
   async start() {
-    // Tell iOS we want to play and record (keeps output on earbuds/speaker, not earpiece)
-    setSessionType('play-and-record');
-    const ac = unlockAudio(); // synchronous part, before any await
+    setSessionType('play-and-record');       // keeps output on earbuds/speaker, not the earpiece
+    const ac = unlockAudio({ fresh: true });  // brand-new engine for this mode
+    setRoute('element');                      // app sound via <audio> while the mic is on
 
-    this.stream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: false,
-        noiseSuppression: false,
-        autoGainControl: false,
-        channelCount: 1,
-      },
-    });
-    if (ac.state !== 'running') await ac.resume();
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 },
+      });
+    } catch (e) {
+      this._resetAudio();
+      throw e;
+    }
 
-    this.source = ac.createMediaStreamSource(this.stream);
-    this.analyser = ac.createAnalyser();
-    this.analyser.fftSize = 2048;
-    this.analyser.smoothingTimeConstant = 0;
-    this.source.connect(this.analyser);
-    this.buf = new Float32Array(this.analyser.fftSize);
-    this.tracker = new PitchTracker({ sampleRate: ac.sampleRate });
-
-    const track = this.stream.getAudioTracks()[0];
+    // The mic is now open: show it immediately, before anything else can go wrong
+    this.stream = stream;
+    this.on = true;
+    const track = stream.getAudioTracks()[0];
     this.deviceLabel = track ? track.label : '';
     this.sampleRate = ac.sampleRate;
-
-    this.on = true;
+    track && track.addEventListener('ended', () => this.stop('ended'));
     this.onStateChange(true);
-    this.timer = setInterval(() => {
-      this.analyser.getFloatTimeDomainData(this.buf);
-      const r = this.tracker.feed(this.buf);
-      r.t = performance.now();
-      this.onFrame(r);
-    }, 30);
+
+    try {
+      if (!(await waitRunning(1500))) throw new Error(`the sound engine is stuck (${ac.state})`);
+      this.source = ac.createMediaStreamSource(stream);
+      this.analyser = ac.createAnalyser();
+      this.analyser.fftSize = 2048;
+      this.analyser.smoothingTimeConstant = 0;
+      this.source.connect(this.analyser);
+      this.buf = new Float32Array(this.analyser.fftSize);
+      this.tracker = new PitchTracker({ sampleRate: ac.sampleRate });
+
+      let zeroSince = performance.now(), warned = false;
+      this.timer = setInterval(() => {
+        this.analyser.getFloatTimeDomainData(this.buf);
+        const r = this.tracker.feed(this.buf);
+        r.t = performance.now();
+        // Watchdog: a real mic is never perfectly silent. All zeros means no audio is arriving.
+        if (r.level > 0) zeroSince = r.t;
+        else if (!warned && r.t - zeroSince > 2000) { warned = true; this.onWarn('nodata'); }
+        this.onFrame(r);
+      }, 30);
+    } catch (e) {
+      this.stop('error');
+      throw e;
+    }
+  }
+
+  _resetAudio() {
+    setRoute('direct');
+    setSessionType('playback');
   }
 
   stop(reason = 'user') {
     if (!this.on && !this.stream) return;
     clearInterval(this.timer);
     this.timer = null;
-    if (this.source) this.source.disconnect();
+    try { if (this.source) this.source.disconnect(); } catch (_) {}
+    this.source = null;
     if (this.stream) this.stream.getTracks().forEach((t) => t.stop()); // releases the mic
     this.stream = null;
     this.on = false;
-    setSessionType('playback');
+    this._resetAudio();
     this.onStateChange(false, reason);
   }
 }
