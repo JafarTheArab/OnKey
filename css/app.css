@@ -30,7 +30,7 @@ body {
 .spacer { flex: 1; }
 .btn { font: inherit; font-weight: 600; border: 0; border-radius: 10px; padding: 9px 16px;
   color: var(--text); background: var(--panel); min-height: 40px; }
-.btn.primary { background: var(--accent); }
+.btn.primary, .btn.small.primary { background: var(--accent); border-color: var(--accent); }
 .btn.primary.stop { background: var(--off); }
 .btn.ghost { border: 1px solid var(--line); background: transparent; }
 
@@ -41,13 +41,15 @@ body {
 @keyframes pulse { 50% { opacity: .3; } }
 
 .stage { flex: 1; display: flex; gap: 10px; min-height: 0; }
-.readout { width: 130px; flex: none; display: flex; flex-direction: column; align-items: center;
+.readout { width: 140px; flex: none; display: flex; flex-direction: column; align-items: center;
   justify-content: center; background: var(--panel); border-radius: 14px; padding: 8px; }
 .note { font-size: 52px; font-weight: 800; color: var(--voice); line-height: 1; }
 .cents { margin-top: 6px; font-size: 18px; font-weight: 700; min-height: 1.3em; }
 .cents.ok { color: var(--on); }
 .cents.sharp, .cents.flat { color: #ffa94d; }
 .hz { color: var(--muted); font-size: 13px; margin-top: 2px; }
+.raw { color: var(--muted); font-size: 11px; margin-top: 6px; text-align: center; min-height: 2.6em; }
+.btn.small { border: 1px solid var(--line); background: var(--bg); font-size: 12px; padding: 6px 8px; min-height: 32px; margin-top: 6px; width: 100%; }
 .meter { margin-top: 12px; width: 80%; height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
 .meter-fill { height: 100%; width: 0; background: var(--on); transition: width 60ms linear; }
 

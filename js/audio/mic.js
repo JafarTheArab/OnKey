@@ -72,6 +72,35 @@ export class Mic {
     }
   }
 
+  /**
+   * Capture `secs` seconds of exactly what the pitch detector receives, in memory only.
+   * Only called when the user taps "Save 5-sec sample". Resolves to { samples, sampleRate }.
+   */
+  captureSample(secs = 5) {
+    const ac = this.source.context;
+    const node = ac.createScriptProcessor(4096, 1, 1);
+    const mute = ac.createGain(); mute.gain.value = 0; // processor must be connected to run; keep it silent
+    const chunks = [], need = Math.round(secs * ac.sampleRate);
+    let got = 0;
+    return new Promise((resolve) => {
+      const finish = () => {
+        this._endCapture = null;
+        try { node.disconnect(); } catch (_) {}
+        const out = new Float32Array(got); let o = 0;
+        for (const c of chunks) { out.set(c, o); o += c.length; }
+        resolve({ samples: out.subarray(0, Math.min(got, need)), sampleRate: ac.sampleRate });
+      };
+      this._endCapture = finish; // if the mic stops early, keep what we have
+      node.onaudioprocess = (e) => {
+        if (got >= need) return;
+        const d = e.inputBuffer.getChannelData(0);
+        chunks.push(new Float32Array(d)); got += d.length;
+        if (got >= need) finish();
+      };
+      this.source.connect(node); node.connect(mute); mute.connect(ac.destination);
+    });
+  }
+
   _resetAudio() {
     setRoute('direct');
     setSessionType('playback');
@@ -81,6 +110,7 @@ export class Mic {
     if (!this.on && !this.stream) return;
     clearInterval(this.timer);
     this.timer = null;
+    if (this._endCapture) this._endCapture();
     try { if (this.source) this.source.disconnect(); } catch (_) {}
     this.source = null;
     if (this.stream) this.stream.getTracks().forEach((t) => t.stop()); // releases the mic

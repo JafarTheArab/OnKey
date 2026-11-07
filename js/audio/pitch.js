@@ -85,9 +85,11 @@ export class PitchTracker {
     const needClarity = holding ? 0.55 : 0.72;
 
     let midi = null, freq = null, periodic = false, reason = null;
+    this.raw = null;
     if (level <= needLevel) reason = 'quiet';
     else {
       const r = yin(buf, this.sampleRate, holding ? { threshold: 0.25 } : undefined);
+      this.raw = r; // what the detector found, even if rejected (shown on screen for diagnosis)
       periodic = !!(r && r.clarity > needClarity);
       if (!periodic) reason = 'unclear';
       if (periodic) {
@@ -121,7 +123,7 @@ export class PitchTracker {
     if (midi === null) {
       this.silentFrames++;
       if (this.silentFrames > 4) { this.recent = []; this.smoothed = null; }
-      return { midi: null, freq: null, level, gate, voiced: false, reason };
+      return { midi: null, freq: null, level, gate, voiced: false, reason, raw: this.raw };
     }
     this.silentFrames = 0;
     this.recent.push(midi);
@@ -130,7 +132,7 @@ export class PitchTracker {
     // Use median to reject single-frame spikes, then light exponential smoothing
     const target = Math.abs(midi - med) > 1.5 ? med : midi;
     this.smoothed = this.smoothed === null ? target : this.smoothed * 0.5 + target * 0.5;
-    return { midi: this.smoothed, rawMidi: midi, freq, level, gate, voiced: true };
+    return { midi: this.smoothed, rawMidi: midi, freq, level, gate, voiced: true, raw: this.raw };
   }
 }
 

@@ -1,4 +1,5 @@
 import { Mic } from './audio/mic.js';
+import { encodeWav } from './audio/wav.js';
 import { unlockAudio, audioState, setSessionType, output, routeName, sessionType } from './audio/engine.js';
 import { midiName, centsOff, isNatural } from './music/notes.js';
 
@@ -6,6 +7,7 @@ const $ = (id) => document.getElementById(id);
 const micBtn = $('micBtn'), toneBtn = $('toneBtn'), badge = $('micBadge');
 const noteEl = $('noteName'), centsEl = $('cents'), hzEl = $('hz'), levelEl = $('level');
 const hint = $('hint'), deviceEl = $('device'), reportEl = $('report'), soundEl = $('soundState');
+const rawEl = $('raw'), sampleBtn = $('sampleBtn'), shareBtn = $('shareBtn');
 const canvas = $('graph'), g = canvas.getContext('2d');
 
 const WINDOW_MS = 6000;      // how much history is visible
@@ -41,13 +43,20 @@ const mic = new Mic({
     }
     while (history.length && r.t - history[0].t > WINDOW_MS + 500) history.shift();
     levelEl.style.width = Math.min(100, (r.level / 0.1) * 100) + '%';
+    // Diagnosis readout: what the detector found, even if it rejected it (refreshed ~6x a second)
+    if (r.t - (rawEl._t || 0) > 160) {
+      rawEl._t = r.t;
+      rawEl.textContent = r.raw
+        ? `heard ${Math.round(r.raw.freq)} Hz · ${Math.round(r.raw.clarity * 100)}% clear${r.midi === null ? ' (skipped)' : ''}`
+        : r.reason === 'quiet' ? 'too quiet to read' : r.reason === 'unclear' ? 'no note found' : '';
+    }
     if (r.midi !== null) {
       // Average the last ~0.25 s so vibrato doesn't make the readout flicker
       const recent = history.slice(-8).filter((p) => p.midi !== null).map((p) => p.midi);
       const avg = recent.reduce((a, b) => a + b, 0) / recent.length;
       const c = centsOff(avg);
       noteEl.textContent = midiName(avg);
-      centsEl.textContent = c === 0 ? 'on' : (c > 0 ? `+${c}¢ sharp` : `${c}¢ flat`);
+      centsEl.textContent = c === 0 ? 'right on' : (c > 0 ? `${c} cent${c === 1 ? '' : 's'} sharp` : `${-c} cent${c === -1 ? '' : 's'} flat`);
       centsEl.className = 'cents ' + (Math.abs(c) <= 10 ? 'ok' : c > 0 ? 'sharp' : 'flat');
       hzEl.textContent = r.freq.toFixed(1) + ' Hz';
       center += (r.midi - center) * 0.04; // gently follow the voice
@@ -59,6 +68,7 @@ const mic = new Mic({
     micBtn.classList.toggle('stop', on);
     hint.hidden = on;
     reportEl.hidden = true;
+    sampleBtn.hidden = !on;
     if (on) {
       resetStats();
       deviceEl.textContent = `Listening on: ${mic.deviceLabel || 'microphone'} · ${mic.sampleRate} Hz · on-device only`;
@@ -70,6 +80,7 @@ const mic = new Mic({
       }[reason] || 'Microphone off. Nothing is recorded or sent anywhere.';
       noteEl.textContent = '–'; centsEl.innerHTML = '&nbsp;'; hzEl.innerHTML = '&nbsp;';
       levelEl.style.width = '0';
+      rawEl.innerHTML = '&nbsp;';
       if (stats && stats.voiced > 15) {
         const why = stats.gaps === 0 ? ' Nice and steady.' : stats.quiet >= stats.unclear
           ? ' Mostly <b>too quiet</b>: the mic barely heard you.'
@@ -95,6 +106,34 @@ micBtn.addEventListener('click', async () => {
         ? 'The iPhone’s sound didn’t start, so I turned the mic back off. Tap Start mic again.'
         : 'Could not start the microphone: ' + e.message;
   }
+});
+
+// Diagnostic sample: only captured when tapped; stays in memory on this phone unless you share it
+let sampleFile = null;
+sampleBtn.addEventListener('click', async () => {
+  if (!mic.on) return;
+  sampleBtn.disabled = true;
+  let left = 5;
+  sampleBtn.textContent = `Sing now… ${left}`;
+  const tick = setInterval(() => { left--; if (left > 0) sampleBtn.textContent = `Sing now… ${left}`; }, 1000);
+  const { samples, sampleRate } = await mic.captureSample(5);
+  clearInterval(tick);
+  const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
+  sampleFile = new File([encodeWav(samples, sampleRate)], `onkey-sample-${stamp}.wav`, { type: 'audio/wav' });
+  sampleBtn.textContent = 'Save 5-sec sample';
+  sampleBtn.disabled = false;
+  shareBtn.hidden = false;
+});
+shareBtn.addEventListener('click', async () => {
+  if (!sampleFile) return;
+  try {
+    if (navigator.canShare && navigator.canShare({ files: [sampleFile] })) {
+      await navigator.share({ files: [sampleFile], title: 'OnKey sample' });
+      return;
+    }
+  } catch (e) { if (e.name === 'AbortError') return; }
+  const a = document.createElement('a'); // fallback: download
+  a.href = URL.createObjectURL(sampleFile); a.download = sampleFile.name; a.click();
 });
 
 function showSound(extra = '') {
