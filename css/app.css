@@ -73,3 +73,5 @@ body {
   background: rgba(11,15,26,.92); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px;
   font-size: 15px; text-align: center; }
 .report b { color: var(--voice); }
+.btn.small.inline { width: auto; margin: 0; padding: 4px 10px; min-height: 28px; }
+.foot { align-items: center; }

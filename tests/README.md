@@ -6,3 +6,4 @@ Run from the `onkey` folder:
 - `node tests/stuck-engine.cjs` (server running): if the sound engine never starts, the mic must switch itself off and say so.
 - `node tests/analyze-sample.mjs <file.wav>`: run the detector over a sample shared from the phone ("Save 5-sec sample") and show where and why it fails.
 - `node tests/real-level.test.mjs`: voice at the real iPhone mic level (measured from a real sample), soft singing, and a TV talking underneath.
+- `node tests/mic-choice.cjs` (server running): with Bluetooth headphones connected, the app listens with the iPhone mic, and the switch button works.

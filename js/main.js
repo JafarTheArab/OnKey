@@ -73,6 +73,7 @@ const mic = new Mic({
     hint.hidden = on;
     reportEl.hidden = true;
     sampleBtn.hidden = !on;
+    showMicSrc();
     if (on) {
       resetStats();
       deviceEl.textContent = `Listening on: ${mic.deviceLabel || 'microphone'} · ${mic.sampleRate} Hz · on-device only`;
@@ -98,10 +99,25 @@ const mic = new Mic({
   },
 });
 
-micBtn.addEventListener('click', async () => {
-  if (mic.on) { mic.stop(); return; }
+// Which mic to listen with. Default: the iPhone's own mic, even with headphones connected.
+const micSrcBtn = $('micSrcBtn');
+let preferPhoneMic = true;
+try { preferPhoneMic = localStorage.getItem('onkey.preferPhoneMic') !== 'no'; } catch (_) {}
+function showMicSrc() {
+  micSrcBtn.hidden = !mic.on || !mic.hasOtherMic;
+  micSrcBtn.textContent = mic.usingPhoneMic ? 'Mic: iPhone ✓ (switch to headphones)' : 'Mic: headphones (switch to iPhone)';
+}
+micSrcBtn.addEventListener('click', () => {
+  preferPhoneMic = !mic.usingPhoneMic;
+  try { localStorage.setItem('onkey.preferPhoneMic', preferPhoneMic ? 'yes' : 'no'); } catch (_) {}
+  mic.stop();
+  startMic(); // still inside the tap
+});
+
+async function startMic() {
   try {
-    await mic.start();
+    await mic.start({ preferPhoneMic });
+    showMicSrc();
   } catch (e) {
     hint.hidden = false;
     hint.textContent = e.name === 'NotAllowedError'
@@ -110,6 +126,11 @@ micBtn.addEventListener('click', async () => {
         ? 'The iPhone’s sound didn’t start, so I turned the mic back off. Tap Start mic again.'
         : 'Could not start the microphone: ' + e.message;
   }
+}
+
+micBtn.addEventListener('click', () => {
+  if (mic.on) { mic.stop(); return; }
+  startMic();
 });
 
 // Diagnostic sample: only captured when tapped; stays in memory on this phone unless you share it
@@ -239,7 +260,8 @@ function draw() {
     if (p.midi === null) continue;
     const px = x(p.t, now), py = y(p.midi);
     // Join across tiny gaps (under 0.2 s) so the line doesn't flicker; break on real silences
-    if (!pen || !last || p.t - last.t > 200) { g.moveTo(px, py); pen = true; } else g.lineTo(px, py);
+    // Break the line on silences, and on big sudden jumps (never draw a misreading as a long streak)
+    if (!pen || !last || p.t - last.t > 200 || Math.abs(p.midi - last.midi) > 4) { g.moveTo(px, py); pen = true; } else g.lineTo(px, py);
     last = p;
   }
   g.stroke();

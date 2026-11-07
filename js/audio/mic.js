@@ -7,6 +7,8 @@
 import { PitchTracker } from './pitch.js';
 import { unlockAudio, waitRunning, setRoute, setSessionType } from './engine.js';
 
+const isPhoneMic = (label = '') => /iphone|ipad|built-in|internal/i.test(label);
+
 export class Mic {
   constructor({ onFrame, onStateChange, onWarn }) {
     this.onFrame = onFrame;
@@ -21,17 +23,20 @@ export class Mic {
     window.addEventListener('pagehide', () => this.stop('background'));
   }
 
-  /** Call from a tap handler. Everything before the first await runs inside the tap. */
-  async start() {
+  /**
+   * Call from a tap handler. Everything before the first await runs inside the tap.
+   * preferPhoneMic: listen with the iPhone's own mic even when headphones are connected.
+   * (A Bluetooth headset's mic drops into low-quality "phone call" mode, which ruins pitch.)
+   */
+  async start({ preferPhoneMic = true } = {}) {
     setSessionType('play-and-record');       // keeps output on earbuds/speaker, not the earpiece
     const ac = unlockAudio({ fresh: true });  // brand-new engine for this mode
     setRoute('element');                      // app sound via <audio> while the mic is on
 
+    const base = { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 };
     let stream;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 },
-      });
+      stream = await navigator.mediaDevices.getUserMedia({ audio: base });
     } catch (e) {
       this._resetAudio();
       throw e;
@@ -40,6 +45,25 @@ export class Mic {
     // The mic is now open: show it immediately, before anything else can go wrong
     this.stream = stream;
     this.on = true;
+    this.onStateChange(true);
+
+    // Device names are only readable after permission, so pick the phone's mic now if needed
+    this.usingPhoneMic = isPhoneMic(stream.getAudioTracks()[0]?.label);
+    if (preferPhoneMic && !this.usingPhoneMic) {
+      try {
+        const inputs = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'audioinput');
+        const phone = inputs.find((d) => isPhoneMic(d.label));
+        if (phone) {
+          const s2 = await navigator.mediaDevices.getUserMedia({ audio: { ...base, deviceId: { exact: phone.deviceId } } });
+          stream.getTracks().forEach((t) => t.stop());
+          stream = this.stream = s2;
+          this.usingPhoneMic = true;
+        }
+      } catch (_) { /* keep the first mic */ }
+    }
+    if (!this.on) { stream.getTracks().forEach((t) => t.stop()); return; } // stopped meanwhile
+    this.hasOtherMic = !this.usingPhoneMic || (await navigator.mediaDevices.enumerateDevices().catch(() => []))
+      .filter((d) => d.kind === 'audioinput' && !isPhoneMic(d.label) && d.label).length > 0;
     const track = stream.getAudioTracks()[0];
     this.deviceLabel = track ? track.label : '';
     this.sampleRate = ac.sampleRate;
