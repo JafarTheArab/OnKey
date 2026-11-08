@@ -60,3 +60,6 @@ never commit them (the repo is public). Take screenshots at 844x390 and look at 
 ## Conventions
 - Commit as the user (`Justin <justfar@live.com>`), with the Co-Authored-By/Claude-Session trailers.
 - Keep `[hidden]{display:none!important}`; avoid stacked pop-ups.
+- **Never show "cents" to the user** (settled in Step 0). Say "On it ✓ / A bit flat ↓ / Sharp ↑" and amounts as
+  "30% of a step" (100% = one piano key). Helpers: `offWords()` and `stepPct()` in `js/music/notes.js`.
+  Cents are fine inside the code only.

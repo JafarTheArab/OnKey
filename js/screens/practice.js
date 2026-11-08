@@ -6,7 +6,7 @@
 // see and everything that's scored is shifted by your measured delay (Timing check), so your voice
 // lines up with the notes you were answering.
 import { Mic, preferPhoneMic } from '../audio/mic.js';
-import { midiName, isNatural } from '../music/notes.js';
+import { midiName, isNatural, stepPct, offWords } from '../music/notes.js';
 import { prepareSong, countInBeats, isDownbeat, lineLabel, bestOctave } from '../music/song.js';
 import { evaluateNote, noteCredit, summarize, tolerance, troubleLine, STRICTNESS } from '../practice/scoring.js';
 import { makeBus, click, guideNote } from '../practice/sounds.js';
@@ -281,7 +281,7 @@ function showResults() {
   store.saveSong();
 
   $('rScore').textContent = sum.score;
-  $('rScoreLabel').innerHTML = `${sum.onPitch} of ${sum.total} notes on pitch<br>on-pitch window ±${tol} cents` +
+  $('rScoreLabel').innerHTML = `${sum.onPitch} of ${sum.total} notes on pitch<br>(on pitch = within ${stepPct(tol)})` +
     (passScores.length > 1 ? `<br>each time: ${passScores.join(', ')}` : '');
   const ul = $('rFindings'); ul.innerHTML = '';
   for (const f of sum.findings) {
@@ -291,13 +291,13 @@ function showResults() {
     ul.append(li);
   }
   const li = document.createElement('li');
-  li.className = 'muted'; li.textContent = '100 cents = one step between neighbouring notes (one piano key).';
+  li.className = 'muted'; li.textContent = '100% of a step = one piano key.';
   ul.append(li);
   // Note by note
   const box = $('rNotes'); box.innerHTML = '';
   for (const ls of sum.lineScores) {
     const div = document.createElement('div'); div.className = 'nline';
-    div.innerHTML = `<div class="muted">${lineLabel(ls.line)} · ${ls.score}</div>`;
+    div.innerHTML = `<div class="muted">${lineLabel(ls.line)} · ${ls.score} (↑ high, ↓ low, % of a step)</div>`;
     const chips = document.createElement('div'); chips.className = 'chips';
     for (const pn of sum.perNote.filter((x) => x.line === ls.line.index)) {
       const c = document.createElement('span');
@@ -305,7 +305,7 @@ function showResults() {
       if (!pn.sung) { c.className = 'chip miss'; c.textContent = `${w} –`; }
       else {
         c.className = 'chip ' + (Math.abs(pn.err) <= tol ? 'ok' : pn.credit > 0.4 ? 'near' : 'off');
-        c.textContent = `${w} ${pn.err > 0 ? '+' : ''}${pn.err}`;
+        c.textContent = Math.abs(pn.err) <= 10 ? `${w} ✓` : `${w} ${pn.err > 0 ? '↑' : '↓'}${Math.abs(pn.err)}%`;
       }
       chips.append(c);
     }
@@ -354,7 +354,7 @@ function renderOptions() {
   tog('oRepeat', repeat); tog('oGuide', s.guide); tog('oMetro', s.metronome); tog('oNames', s.names); tog('oAuto', s.autoSpeed);
   for (const b of $('oOctave').children) b.classList.toggle('on', Number(b.dataset.v) === song.transpose);
   for (const b of $('oStrict').children) b.classList.toggle('on', b.dataset.v === s.strictness);
-  $('oTolNote').textContent = `Score counts a note as on pitch within ±${tol} cents (${STRICTNESS[s.strictness].label}). ` +
+  $('oTolNote').textContent = `Score counts a note as on pitch within ${stepPct(tol)} (${STRICTNESS[s.strictness].label}). ` +
     'It tightens on its own as you get more accurate. The pitch line and the breakdown are always exact.';
 }
 function hidePanels() { $('pOptions').hidden = true; $('pResults').hidden = true; }
@@ -552,7 +552,7 @@ function draw() {
       if (n && (head.beat - n.beat) / rate > 0.15) { // once you've settled on the note
         let cents = Math.round((head.midi - n.midi) * 100);
         const oct = Math.round(cents / 1200); cents -= oct * 1200;
-        const txt = Math.abs(cents) <= 10 ? '✓' : `${cents > 0 ? '+' : ''}${cents}${oct ? (oct < 0 ? ' (8vb)' : ' (8va)') : ''}`;
+        const txt = offWords(cents) + (oct ? (oct < 0 ? ' (octave low)' : ' (octave high)') : '');
         g.font = 'bold 13px -apple-system, sans-serif';
         g.fillStyle = Math.abs(cents) <= tol ? '#36d67a' : '#ffa94d';
         g.fillText(txt, x(head.beat) + 10, y(head.midi) - 12);

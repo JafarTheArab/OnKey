@@ -38,7 +38,7 @@ check('on pitch scores high', s.score >= 95 && s.onPitch === s.total, `score=${s
 check('on pitch: centred', has(s, 'overall', /centred/));
 
 s = run(sing(() => -30));
-check('30 cents flat: forgiving score but honest', s.score >= 60 && s.score < 100 && has(s, 'overall', /flat: on average 30 cents under/), `score=${s.score}`);
+check('30 cents flat: forgiving score but honest', s.score >= 60 && s.score < 100 && has(s, 'overall', /flat: on average 30% of a step low/), `score=${s.score}`);
 console.log(show(s));
 
 s = run(sing((n, t) => (n.dur >= 4 ? -40 * t : 0)));

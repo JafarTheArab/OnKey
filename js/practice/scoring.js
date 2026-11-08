@@ -69,7 +69,8 @@ export function noteCredit(res, tol) {
 const weight = (n) => Math.sqrt(Math.max(0.5, n.dur));
 const q = (w) => `‘${w}’`;
 const list = (words) => [...new Set(words)].slice(0, 3).map(q).join(', ');
-const cents = (c) => `${Math.abs(Math.round(c))} cent${Math.abs(Math.round(c)) === 1 ? '' : 's'}`;
+// Amounts are shown as "% of a step" (100% = one piano key), the wording settled on in Step 0
+const cents = (c) => `${Math.abs(Math.round(c))}% of a step`;
 const dir = (c) => (c < 0 ? 'flat' : 'sharp');
 
 /**
@@ -100,8 +101,8 @@ export function summarize(song, attempts, { tol, secPerBeat }) {
     add('missed', `OnKey only heard you on ${sung.length} of ${total} notes, so there isn’t much to go on. Sing a bit louder, or check the mic is the iPhone’s (Mic check on the home screen).`);
   } else {
     // 1. Overall lean
-    if (Math.abs(avgSigned) >= 8) add('overall', `Overall you sat a little ${dir(avgSigned)}: on average ${cents(avgSigned)} ${avgSigned < 0 ? 'under' : 'over'} the notes.`);
-    else add('overall', `Overall you were centred on the notes (on average ${cents(avgSigned)} ${dir(avgSigned)}).`, { good: true });
+    if (Math.abs(avgSigned) >= 8) add('overall', `Overall you sat a little ${dir(avgSigned)}: on average ${cents(avgSigned)} ${avgSigned < 0 ? 'low' : 'high'}.`);
+    else add('overall', `Overall you were centred on the notes (on average only ${cents(avgSigned)} ${avgSigned < 0 ? 'low' : 'high'}).`, { good: true });
 
     // 2. Octave
     if (octave !== 0 && octaves.filter((o) => o === octave).length >= sung.length * 0.6) {
@@ -126,7 +127,7 @@ export function summarize(song, attempts, { tol, secPerBeat }) {
         const e = mean(after.map((j) => j.res.err));
         if (Math.abs(e - avgSigned) >= 12 && Math.abs(e) >= 15) {
           const ex = after.filter((j) => Math.sign(j.res.err) === Math.sign(e)).map((j) => j.n.word);
-          add('jump', `You came in ${dir(e)} after jumps ${label} (like ${list(ex)}): about ${cents(e)} ${dir(e)}. Hear the new note in your head before you jump.`);
+          add('jump', `You came in ${dir(e)} after jumps ${label} (like ${list(ex)}): about ${cents(e)} ${e < 0 ? 'low' : 'high'}. Hear the new note in your head before you jump.`);
         }
       }
     }
@@ -140,7 +141,7 @@ export function summarize(song, attempts, { tol, secPerBeat }) {
         if (grp.length < 2) continue;
         const e = mean(grp.map((j) => j.res.err));
         if (Math.abs(e) >= 15 && Math.abs(e - avgSigned) >= 10) {
-          add('register', `Your ${name} notes ran ${dir(e)} (${list(grp.filter((j) => Math.sign(j.res.err) === Math.sign(e)).map((j) => j.n.word))}): about ${cents(e)} ${dir(e)}.`);
+          add('register', `Your ${name} notes ran ${dir(e)} (${list(grp.filter((j) => Math.sign(j.res.err) === Math.sign(e)).map((j) => j.n.word))}): about ${cents(e)} ${e < 0 ? 'low' : 'high'}.`);
         }
       }
     }
@@ -154,8 +155,8 @@ export function summarize(song, attempts, { tol, secPerBeat }) {
     });
     if (scoops.length >= 4) {
       const s = median(scoops.map((j) => j.res.scoop));
-      if (s <= -35) add('scoop', `You often slide up into notes from below (about ${cents(s)} under at the start). Try landing right on the note.`);
-      else if (s >= 35) add('scoop', `You often start notes a little high and settle down (about ${cents(s)} over at the start).`);
+      if (s <= -35) add('scoop', `You often slide up into notes from below (about ${cents(s)} low at the start). Try landing right on the note.`);
+      else if (s >= 35) add('scoop', `You often start notes a little high and settle down (about ${cents(s)} high at the start).`);
     }
 
     // 7. Missed notes

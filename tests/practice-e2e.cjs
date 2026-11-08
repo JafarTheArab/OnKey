@@ -61,7 +61,7 @@ const mode = process.argv[2] || 'drift';
   const s = Number(score);
   const ok = badge && !badgeAfter && !errs.length && (
     mode === 'drift' ? s >= 70 && findings.some((f) => /drifted flat on the long notes/.test(f)) :
-    mode === 'sharp' ? findings.some((f) => /sharp: on average (3\d|4\d) cents over/.test(f)) :
+    mode === 'sharp' ? findings.some((f) => /sharp: on average (3\d|4\d)% of a step high/.test(f)) :
     s >= 60);
   console.log(ok ? `PASS  practice e2e (${mode})` : `FAIL  practice e2e (${mode})`);
   await b.close(); process.exit(ok ? 0 : 1);
