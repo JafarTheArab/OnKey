@@ -13,3 +13,12 @@ export function centsOff(midi) {
 }
 
 export const isNatural = (m) => [0, 2, 4, 5, 7, 9, 11].includes(((m % 12) + 12) % 12);
+
+/** "D4" / "C#3" / "Bb2" -> MIDI number */
+export function nameToMidi(name) {
+  const m = /^([A-G])([#♯b♭]?)(-?\d)$/.exec(name);
+  if (!m) throw new Error('bad note name ' + name);
+  const base = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[m[1]];
+  const acc = m[2] === '#' || m[2] === '♯' ? 1 : m[2] ? -1 : 0;
+  return base + acc + (Number(m[3]) + 1) * 12;
+}

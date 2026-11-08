@@ -44,6 +44,8 @@ export class Mic {
 
     // The mic is now open: show it immediately, before anything else can go wrong
     this.stream = stream;
+    this.openedAt = performance.now(); // when the mic opened (used to line up the song start)
+    this.ctx = ac;
     this.on = true;
     this.onStateChange(true);
 
@@ -85,6 +87,7 @@ export class Mic {
         this.analyser.getFloatTimeDomainData(this.buf);
         const r = this.tracker.feed(this.buf);
         r.t = performance.now();
+        r.ct = ac.currentTime; // sound-engine clock, used to line the voice up with the music
         // Watchdog: a real mic is never perfectly silent. All zeros means no audio is arriving.
         if (r.level > 0) zeroSince = r.t;
         else if (!warned && r.t - zeroSince > 2000) { warned = true; this.onWarn('nodata'); }
@@ -143,4 +146,9 @@ export class Mic {
     this._resetAudio();
     this.onStateChange(false, reason);
   }
+}
+
+/** The user's choice of which mic to listen with (set on the Mic check screen). Default: the iPhone's own. */
+export function preferPhoneMic() {
+  try { return localStorage.getItem('onkey.preferPhoneMic') !== 'no'; } catch (_) { return true; }
 }

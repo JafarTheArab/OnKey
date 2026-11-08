@@ -10,7 +10,7 @@ const { chromium } = require('playwright');
     const gum = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
     navigator.mediaDevices.getUserMedia = async (c) => { const s = await gum(c); window.__stream = s; return s; };
   });
-  await p.goto('http://localhost:8765/');
+  await p.goto('http://localhost:8765/#check');
   await p.click('#micBtn');
   await p.waitForTimeout(400);
   const badgeEarly = await p.isVisible('#micBadge');

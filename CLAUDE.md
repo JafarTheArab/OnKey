@@ -12,21 +12,32 @@ The user is not a developer: plain language, exact taps, no jargon.
 ## Status
 - **Step 0: done and confirmed on the user's iPhone** (2026-11-08). Pitch check screen works with and without
   Bluetooth headphones. User approved building from scratch (AllKaraoke has no license; others too small).
-- **Next: Stage 1a**: range test, scrolling practice screen (bars right-to-left, live voice line, karaoke
-  lyrics, note names toggle, count-in, metronome toggle, speed + auto-adjust, loop + trouble spots), scoring
-  with honest end-of-song breakdown. Use one public-domain test melody (Amazing Grace: NEW BRITAIN tune
-  + John Newton 1779 words, both PD; write our own arrangement).
-- **Then Stage 1b**: octave up/down, generated harmony (3rd above/below, in key), fit-my-voice, "hear my part",
+- **Stage 1a: built 2026-11-08, waiting for the user to try it on the iPhone** (don't start 1b until confirmed).
+  Home screen, range test (auto-opens on first visit), timing check ("ta" on clicks -> delay), practice screen
+  (bars, voice line, lyrics, names toggle, count-in + starting note, metronome, speed +/- and auto speed,
+  part = whole/verse/line + repeat, trouble spots), forgiving score with Gentle/Normal/Strict that tightens
+  as you improve, exact breakdown (overall lean, long-note drift, after jumps, high/low notes, scoops, misses,
+  hardest/strongest line, note-by-note cents). Song: Amazing Grace, 3 verses. Octave down/as written/up is
+  already in Options (default picked from the range). Guide melody is a simple built-in synth (no library).
+- **Then Stage 1b**: generated harmony (3rd above/below, in key), fit-my-voice, "hear my part",
   layered playback. Ask the user to approve a soundfont/synth library before 1b.
 - Stage 1 was estimated at 2-3 sessions; check in after 1a.
 
 ## Code map
 - `js/audio/pitch.js`: YIN + `PitchTracker` (adaptive noise gate, hysteresis while holding a note,
-  octave-jump guard, median + light smoothing). No DOM, reusable by Keyfall.
+  octave-jump guard, median + light smoothing). No DOM, reusable by Keyfall. Its smoothing delays the
+  pitch by ~0.12 s (`PITCH_LAG` in practice.js compensates).
 - `js/audio/engine.js`: shared AudioContext and iOS workarounds; all app sound must go through `output()`.
-- `js/audio/mic.js`: mic lifecycle and privacy; prefers the iPhone mic; `captureSample()` for diagnosis.
-- `js/audio/wav.js`: WAV encoder. `js/music/notes.js`: note names.
-- `js/main.js`: the Step 0 pitch-check screen (will become the "mic check" screen).
+- `js/audio/mic.js`: mic lifecycle and privacy; prefers the iPhone mic; frames carry `t` (performance.now)
+  and `ct` (engine clock); `mic.ctx` is the fresh AudioContext of the current mic session.
+- `js/main.js`: screens/navigation (home is in here). `#check`, `#range`, `#timing` in the URL open those screens.
+- `js/screens/practice.js`: practice screen. Timing = list of anchors mapping engine time -> song beats
+  (new anchor on speed change or repeat). Display/scoring use engine time minus the measured delay.
+- `js/screens/range.js`, `timing.js`, `check.js` (the Step 0 mic check).
+- `js/practice/scoring.js` (pure: per-note judging on the steady middle, octave-folded score, findings),
+  `js/practice/sounds.js` (click + guide voice). `js/music/song.js` (prepare/transposition/count-in),
+  `js/music/range.js` (holds, voice type), `js/music/notes.js`. `js/songs/amazing-grace.js` (PD, own arrangement).
+- `js/store.js`: localStorage (`onkey.v1`): range, latency, settings, per-song runs/noteHist/lastLine/best.
 - Planned: `js/songimport/` as a self-contained module (MIDI, "find this song", audio-to-notes) for Keyfall reuse.
 
 ## Hard-won iPhone facts (verified on the user's phone)

@@ -4,7 +4,7 @@ const { chromium } = require('playwright');
   const ctx = await b.newContext({ viewport: { width: 844, height: 390 }, deviceScaleFactor: 2, permissions: ['microphone'] });
   const p = await ctx.newPage(); const errs = [];
   p.on('pageerror', e => errs.push(e.message)); p.on('console', m => m.type()==='error' && errs.push(m.text()));
-  await p.goto('http://localhost:8765/');
+  await p.goto('http://localhost:8765/#check');
   await p.screenshot({ path: __dirname + '/out/shot-idle.png' });
   await p.click('#toneBtn'); await p.waitForTimeout(300);
   const soundBefore = await p.textContent('#soundState');

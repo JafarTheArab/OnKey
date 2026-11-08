@@ -21,7 +21,7 @@ const { chromium } = require('playwright');
       return s;
     };
   });
-  await p.goto('http://localhost:8765/');
+  await p.goto('http://localhost:8765/#check');
   await p.click('#micBtn'); await p.waitForTimeout(800);
   const first = { device: await p.textContent('#device'), btn: await p.textContent('#micSrcBtn'),
     openMics: await p.evaluate(() => window.__live.filter((t) => t.readyState === 'live').length) };
