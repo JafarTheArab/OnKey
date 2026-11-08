@@ -12,7 +12,7 @@ The user is not a developer: plain language, exact taps, no jargon.
 ## Status
 - **Step 0: done and confirmed on the user's iPhone** (2026-11-08). Pitch check screen works with and without
   Bluetooth headphones. User approved building from scratch (AllKaraoke has no license; others too small).
-- **Stage 1a: built 2026-11-08, waiting for the user to try it on the iPhone** (don't start 1b until confirmed).
+- **Stage 1a: built and published to main 2026-11-08, waiting for the user to try it on the iPhone** (don't start 1b until confirmed).
   Home screen, range test (auto-opens on first visit), timing check ("ta" on clicks -> delay), practice screen
   (bars, voice line, lyrics, names toggle, count-in + starting note, metronome, speed +/- and auto speed,
   part = whole/verse/line + repeat, trouble spots), forgiving score with Gentle/Normal/Strict that tightens
