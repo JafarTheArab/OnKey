@@ -75,4 +75,6 @@ check('trouble spot from history', tr && tr.line === 5, JSON.stringify(tr));
 
 check('octave choice: baritone sings it an octave down', bestOctave(raw, { low: 45, high: 64 }) === -12);
 check('octave choice: alto sings as written', bestOctave(raw, { low: 55, high: 74 }) === 0);
+check('octave choice: Justin’s first result (A2 to E♭5) still sings it an octave down', bestOctave(raw, { low: 45, high: 75 }) === -12);
+check('octave choice: G2 to G5 (reach saved as comfortable) still an octave down', bestOctave(raw, { low: 43, high: 79 }) === -12);
 process.exit(fail ? 1 : 0);

@@ -53,11 +53,15 @@ export const lineLabel = (l) => `Verse ${l.verse}, line ${l.lineInVerse}`;
 export function bestOctave(song, range) {
   if (!range) return 0;
   const midis = song.notes.map((n) => nameToMidi(n.name));
-  let best = 0, bestOut = Infinity;
+  let best = 0, bestCost = Infinity;
+  const songMid = (Math.min(...midis) + Math.max(...midis)) / 2;
+  const aim = (range.low + range.high) / 2 - 1; // the middle of your range, a little low
   for (const shift of [0, -12, 12]) {
-    // Notes above your comfortable range count double: straining up is worse than a low note
+    // Notes outside your comfortable range cost the most (above it double: straining up is worse
+    // than a low note); after that, prefer the octave closest to the middle of your range
     const out = midis.reduce((s, m) => s + Math.max(0, range.low - (m + shift), 2 * ((m + shift) - range.high)), 0);
-    if (out < bestOut - 1e-9) { bestOut = out; best = shift; }
+    const cost = out * 10 + Math.abs(songMid + shift - aim);
+    if (cost < bestCost - 1e-9) { bestCost = cost; best = shift; }
   }
   return best;
 }

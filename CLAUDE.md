@@ -55,7 +55,12 @@ The user is not a developer: plain language, exact taps, no jargon.
   Now practice/range/timing always use the iPhone mic, the Mic check switch isn't remembered, and every
   "Mic on" badge names the mic. A just-switched mic can deliver silence for a while: mic.js re-opens it once.
 - User: singing high strains his voice (as-written Amazing Grace was too high; he chose Octave: Down).
-  Octave choice now counts notes above the range double.
+  Octave choice now counts notes above the range double, then aims at the middle of the range (a bit low).
+- 2026-11-10 retest (iPhone mic): A2 to E♭5; he says E♭5 was "popped up" without control. Range test now keeps
+  REACH (anything hit) apart from COMFORTABLE (holds >= 1.8 s with little wander/shake, see isSteadyHold),
+  and the result screen (also Home › Adjust) has −/+ for the comfortable low/high. He likes singing high;
+  don't call his high notes wrong, just keep songs inside the comfortable range.
+- 282 ms timing delay measured twice with his Sony Bluetooth headphones (consistent).
 - A TV or other voices nearby confuse detection (they're pitched too). "Learn the room" is a future idea.
 
 ## Tests (run from repo root; serve with `python3 -m http.server 8765` for browser tests)

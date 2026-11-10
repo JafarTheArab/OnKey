@@ -163,3 +163,9 @@ body {
 .beat-dot.flash { background: var(--target); }
 .mic-badge .micname { font-weight: 600; color: #ffb3b5; }
 .mic-badge.warn .micname { color: #ffa94d; }
+.row.tight-row { margin-top: 6px; }
+.adjust { margin: 8px 0 4px; display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+.adjust b { font-size: 18px; color: var(--voice); min-width: 40px; text-align: center; }
+.r-text > div { margin-bottom: 6px; }
+.adj-label { width: 64px; color: var(--muted); }
+.adjust .btn { min-width: 40px; font-size: 18px; }

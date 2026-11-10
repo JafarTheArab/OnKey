@@ -4,7 +4,7 @@ import { practiceScreen } from './screens/practice.js';
 import { rangeScreen } from './screens/range.js';
 import { timingScreen } from './screens/timing.js';
 import { store } from './store.js';
-import { describeRange } from './music/range.js';
+import { describeRange, describeReach } from './music/range.js';
 import { prepareSong, lineLabel } from './music/song.js';
 import { troubleLine } from './practice/scoring.js';
 import song from './songs/amazing-grace.js';
@@ -52,13 +52,16 @@ function renderHome() {
     b.onclick = () => go('practice', { loopLine: tr.line });
     $('homeTrouble').append(b);
   }
-  $('homeRange').textContent = d.range ? describeRange(d.range) : 'Not tested yet';
+  $('homeRange').textContent = d.range ? 'Comfortable: ' + describeRange(d.range) : 'Not tested yet';
+  $('homeReach').textContent = d.range && d.range.reachLow != null ? `Reach: ${describeReach(d.range)}` : '';
   $('homeRangeBtn').textContent = d.range ? 'Test again' : 'Test my range (1 min)';
+  $('homeRangeAdj').hidden = !d.range;
   $('homeTiming').textContent = d.latency != null ? `Lined up (${Math.round(d.latency * 1000)} ms delay)` : 'Not lined up yet. Do this once with your earbuds in.';
   $('homeTimingBtn').textContent = d.latency != null ? 'Line up again' : 'Line up timing (20 sec)';
 }
 $('homeSing').addEventListener('click', () => go('practice', { startLine: 0 }));
 $('homeRangeBtn').addEventListener('click', () => go('range'));
+$('homeRangeAdj').addEventListener('click', () => go('range', { adjust: true }));
 $('homeTimingBtn').addEventListener('click', () => go('timing'));
 $('homeCheckBtn').addEventListener('click', () => go('check'));
 
