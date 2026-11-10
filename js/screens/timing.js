@@ -1,6 +1,6 @@
 // Timing check: plays clicks, you say "ta" on each one; OnKey measures the delay between
 // a sound being played and hearing your answer (earbuds, especially Bluetooth, add a delay).
-import { Mic, preferPhoneMic } from '../audio/mic.js';
+import { Mic, preferPhoneMic, showMicBadge } from '../audio/mic.js';
 import { makeBus, click } from '../practice/sounds.js';
 import { store } from '../store.js';
 
@@ -31,7 +31,7 @@ const mic = new Mic({
     }
   },
   onStateChange(on, reason) {
-    $('tmMicBadge').hidden = !on;
+    showMicBadge($('tmMicBadge'), mic, on);
     if (!on && timer) { clearTimeout(timer); timer = null; if (reason !== 'user') $('tmResult').textContent = 'Stopped early. Tap Start to try again.'; $('tmGo').disabled = false; }
   },
 });

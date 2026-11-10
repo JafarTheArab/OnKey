@@ -55,7 +55,8 @@ export function bestOctave(song, range) {
   const midis = song.notes.map((n) => nameToMidi(n.name));
   let best = 0, bestOut = Infinity;
   for (const shift of [0, -12, 12]) {
-    const out = midis.reduce((s, m) => s + Math.max(0, range.low - (m + shift), (m + shift) - range.high), 0);
+    // Notes above your comfortable range count double: straining up is worse than a low note
+    const out = midis.reduce((s, m) => s + Math.max(0, range.low - (m + shift), 2 * ((m + shift) - range.high)), 0);
     if (out < bestOut - 1e-9) { bestOut = out; best = shift; }
   }
   return best;

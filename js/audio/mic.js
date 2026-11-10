@@ -29,6 +29,7 @@ export class Mic {
    * (A Bluetooth headset's mic drops into low-quality "phone call" mode, which ruins pitch.)
    */
   async start({ preferPhoneMic = true } = {}) {
+    this.deviceLabel = undefined; this.usingPhoneMic = false; // not known until the mic is open
     setSessionType('play-and-record');       // keeps output on earbuds/speaker, not the earpiece
     const ac = unlockAudio({ fresh: true });  // brand-new engine for this mode
     setRoute('element');                      // app sound via <audio> while the mic is on
@@ -82,15 +83,18 @@ export class Mic {
       this.buf = new Float32Array(this.analyser.fftSize);
       this.tracker = new PitchTracker({ sampleRate: ac.sampleRate });
 
-      let zeroSince = performance.now(), warned = false;
+      let zeroSince = performance.now(), warned = false, healed = false;
       this.timer = setInterval(() => {
         this.analyser.getFloatTimeDomainData(this.buf);
         const r = this.tracker.feed(this.buf);
         r.t = performance.now();
         r.ct = ac.currentTime; // sound-engine clock, used to line the voice up with the music
         // Watchdog: a real mic is never perfectly silent. All zeros means no audio is arriving.
+        // Switching mics on an iPhone sometimes leaves the new one silent for a while:
+        // first try re-opening it once by itself, and only then tell the user.
         if (r.level > 0) zeroSince = r.t;
-        else if (!warned && r.t - zeroSince > 2000) { warned = true; this.onWarn('nodata'); }
+        else if (!healed && r.t - zeroSince > 1500) { healed = true; this._reopen(base); }
+        else if (!warned && r.t - zeroSince > 4500) { warned = true; this.onWarn('nodata'); }
         this.onFrame(r);
       }, 30);
     } catch (e) {
@@ -128,6 +132,21 @@ export class Mic {
     });
   }
 
+  /** Re-open the same microphone and reconnect it (no tap needed: the sound engine keeps running). */
+  async _reopen(base) {
+    try {
+      const old = this.stream, id = old && old.getAudioTracks()[0]?.getSettings?.().deviceId;
+      const s2 = await navigator.mediaDevices.getUserMedia({ audio: id ? { ...base, deviceId: { exact: id } } : base });
+      if (!this.on || this.stream !== old) { s2.getTracks().forEach((t) => t.stop()); return; }
+      old.getTracks().forEach((t) => t.stop());
+      this.stream = s2;
+      try { this.source.disconnect(); } catch (_) {}
+      this.source = this.analyser.context.createMediaStreamSource(s2);
+      this.source.connect(this.analyser);
+      s2.getAudioTracks()[0]?.addEventListener('ended', () => this.stop('ended'));
+    } catch (_) { /* the warning will follow */ }
+  }
+
   _resetAudio() {
     setRoute('direct');
     setSessionType('playback');
@@ -148,7 +167,22 @@ export class Mic {
   }
 }
 
-/** The user's choice of which mic to listen with (set on the Mic check screen). Default: the iPhone's own. */
-export function preferPhoneMic() {
-  try { return localStorage.getItem('onkey.preferPhoneMic') !== 'no'; } catch (_) { return true; }
+/**
+ * Practice, range test and timing check always listen with the iPhone's own mic: a Bluetooth headset
+ * mic drops into low-quality call mode and cuts out. (The Mic check's switch is only for trying the other
+ * mic and is not remembered. An earlier version did remember it, which sent everything to the headset mic.)
+ */
+export function preferPhoneMic() { return true; }
+try { localStorage.removeItem('onkey.preferPhoneMic'); } catch (_) {}
+
+/** Plain-language name for the mic in use. */
+export const micName = (mic) => (mic.usingPhoneMic ? 'iPhone mic ✓' : `headphone mic${mic.deviceLabel ? ` (${mic.deviceLabel})` : ''}`);
+
+/** Show "Mic on · iPhone mic ✓" (or a warning if it's the headphones' mic) in a badge element. */
+export function showMicBadge(badge, mic, on) {
+  badge.hidden = !on;
+  const name = badge.querySelector('.micname');
+  if (!name) return;
+  name.textContent = on && mic.deviceLabel !== undefined ? '· ' + micName(mic) : '';
+  badge.classList.toggle('warn', on && mic.deviceLabel !== undefined && !mic.usingPhoneMic);
 }

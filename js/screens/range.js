@@ -1,5 +1,5 @@
 // Range test: lowest comfortable note, highest comfortable note, then a slide between them.
-import { Mic, preferPhoneMic } from '../audio/mic.js';
+import { Mic, preferPhoneMic, showMicBadge } from '../audio/mic.js';
 import { midiName, isNatural } from '../music/notes.js';
 import { steadyHolds, slideExtent, describeRange } from '../music/range.js';
 import { store } from '../store.js';
@@ -23,7 +23,7 @@ const mic = new Mic({
     analyse();
   },
   onStateChange(on, reason) {
-    $('rgMicBadge').hidden = !on;
+    showMicBadge($('rgMicBadge'), mic, on);
     if (!on && step >= 1 && step <= 3 && reason !== 'user') {
       $('rgHeard').textContent = reason === 'background' ? 'Paused because OnKey went to the background. Tap Start this step again.' : 'The mic stopped. Tap Start this step again.';
       $('rgGo').disabled = true; $('rgRedo').hidden = false;

@@ -15,3 +15,4 @@ Stage 1a (server running on 8765; run `timing-e2e` first, since the practice tes
 - `node tests/practice-e2e.cjs [drift|sharp|quiet]`: sings verse 1 an octave down (long notes sinking flat / 40 cents sharp / at real iPhone mic level). Screenshots in `tests/out/`.
 - `node tests/loop-e2e.cjs`: repeats one line; flat the first time, on pitch the second; each time is scored.
 - `node tests/speed-e2e.cjs`: speed buttons mid-song and auto speed slowing down.
+- `node tests/mic-default.cjs`: an old saved "headphones mic" choice + Bluetooth connected: practice still uses the iPhone mic, the badge says "iPhone mic ✓", Done stops the mic and shows the score.

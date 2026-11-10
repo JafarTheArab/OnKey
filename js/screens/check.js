@@ -101,15 +101,13 @@ const mic = new Mic({
 
 // Which mic to listen with. Default: the iPhone's own mic, even with headphones connected.
 const micSrcBtn = $('micSrcBtn');
-let preferPhoneMic = true;
-try { preferPhoneMic = localStorage.getItem('onkey.preferPhoneMic') !== 'no'; } catch (_) {}
+let preferPhoneMic = true; // starts on the iPhone mic every time; the switch below is just for trying
 function showMicSrc() {
   micSrcBtn.hidden = !mic.on || !mic.hasOtherMic;
   micSrcBtn.textContent = mic.usingPhoneMic ? 'Mic: iPhone ✓ (switch to headphones)' : 'Mic: headphones (switch to iPhone)';
 }
 micSrcBtn.addEventListener('click', () => {
   preferPhoneMic = !mic.usingPhoneMic;
-  try { localStorage.setItem('onkey.preferPhoneMic', preferPhoneMic ? 'yes' : 'no'); } catch (_) {}
   mic.stop();
   startMic(); // still inside the tap
 });

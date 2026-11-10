@@ -50,6 +50,12 @@ The user is not a developer: plain language, exact taps, no jargon.
 - Bluetooth headset mic = call mode = unusable for pitch. Re-open with the "iPhone Microphone" deviceId after
   permission; output stays on the headphones. Keep this the default.
 - Show the mic badge the moment getUserMedia resolves; on any later failure stop the tracks and say why.
+- 2026-11-10 (user's phone, Sony headphones): Step 0's Mic check used to SAVE "use headphones mic"; the new
+  screens obeyed it, so the range test cut out and probably measured the range wrong (song came out too high).
+  Now practice/range/timing always use the iPhone mic, the Mic check switch isn't remembered, and every
+  "Mic on" badge names the mic. A just-switched mic can deliver silence for a while: mic.js re-opens it once.
+- User: singing high strains his voice (as-written Amazing Grace was too high; he chose Octave: Down).
+  Octave choice now counts notes above the range double.
 - A TV or other voices nearby confuse detection (they're pitched too). "Learn the room" is a future idea.
 
 ## Tests (run from repo root; serve with `python3 -m http.server 8765` for browser tests)

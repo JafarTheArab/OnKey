@@ -5,7 +5,7 @@
 // song beats (a new anchor whenever the speed changes or a repeated part jumps back). Everything you
 // see and everything that's scored is shifted by your measured delay (Timing check), so your voice
 // lines up with the notes you were answering.
-import { Mic, preferPhoneMic } from '../audio/mic.js';
+import { Mic, preferPhoneMic, showMicBadge } from '../audio/mic.js';
 import { midiName, isNatural, stepPct, offWords } from '../music/notes.js';
 import { prepareSong, countInBeats, isDownbeat, lineLabel, bestOctave } from '../music/song.js';
 import { evaluateNote, noteCredit, summarize, tolerance, troubleLine, STRICTNESS } from '../practice/scoring.js';
@@ -43,7 +43,7 @@ const mic = new Mic({
     if (arr.length > 12000) arr.splice(0, 2000);
   },
   onStateChange(on, reason) {
-    $('pMicBadge').hidden = !on;
+    showMicBadge($('pMicBadge'), mic, on);
     if (!on && (state === 'playing' || state === 'starting')) {
       pause(reason === 'background' ? 'Paused because OnKey went to the background. The mic is off.'
         : reason === 'ended' ? 'Paused: the iPhone took the microphone (a call or another app?).' : 'Paused.');
@@ -132,10 +132,11 @@ async function start(fromLine) {
   state = 'starting';
   $('pMsg').hidden = true; hidePanels();
   $('pPlay').textContent = 'Pause';
+  $('pDone').hidden = false;
   try {
     await mic.start({ preferPhoneMic: preferPhoneMic() });
   } catch (e) {
-    state = 'idle'; $('pPlay').textContent = 'Start';
+    state = 'idle'; $('pPlay').textContent = 'Start'; $('pDone').hidden = true;
     showMsg(e.name === 'NotAllowedError'
       ? 'Microphone permission was denied. In Settings › Safari › Microphone, allow access, then try again.'
       : 'The microphone didn’t start. Tap Start to try again.');
@@ -162,6 +163,7 @@ async function start(fromLine) {
 
 function stopSound() {
   clearInterval(schedTimer); schedTimer = null;
+  $('pDone').hidden = true;
   if (bus) { try { bus.disconnect(); } catch (_) {} bus = null; }
   sched = null;
 }
@@ -386,6 +388,7 @@ export const practiceScreen = {
   init(ctx) {
     go = ctx.go; rawSong = ctx.song;
     $('pBack').addEventListener('click', () => go('home'));
+    $('pDone').addEventListener('click', () => finish()); // stop and see the score (handy when repeating)
     $('pPlay').addEventListener('click', () => {
       if (state === 'playing' || state === 'starting') pause();
       else if (state === 'paused') resume(currentLine());
