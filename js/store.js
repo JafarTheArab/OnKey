@@ -12,6 +12,8 @@ function load() {
   if (data) return data;
   try { data = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (_) { data = {}; }
   data = { ...structuredClone(DEFAULTS), ...data, settings: { ...DEFAULTS.settings, ...(data.settings || {}) } };
+  // 2026-11: "Auto" octave added and made the default; switch an earlier manual choice back to Auto once
+  if (!data.octaveAutoV1) { data.settings.octave = null; data.octaveAutoV1 = true; save(); }
   return data;
 }
 function save() { try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (_) {} }

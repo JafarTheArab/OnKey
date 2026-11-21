@@ -169,3 +169,4 @@ body {
 .r-text > div { margin-bottom: 6px; }
 .adj-label { width: 64px; color: var(--muted); }
 .adjust .btn { min-width: 40px; font-size: 18px; }
+.toast { z-index: 5; }

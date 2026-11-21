@@ -354,7 +354,8 @@ function renderOptions() {
   if (sel.selectedIndex < 0) { sel.add(new Option(partName(part.from, part.to), `${part.from}-${part.to}`)); sel.value = `${part.from}-${part.to}`; }
   const tog = (id, on) => $(id).classList.toggle('on', !!on);
   tog('oRepeat', repeat); tog('oGuide', s.guide); tog('oMetro', s.metronome); tog('oNames', s.names); tog('oAuto', s.autoSpeed);
-  for (const b of $('oOctave').children) b.classList.toggle('on', Number(b.dataset.v) === song.transpose);
+  // Auto = picked from your comfortable range (the default); otherwise the octave you chose
+  for (const b of $('oOctave').children) b.classList.toggle('on', b.dataset.v === 'auto' ? s.octave == null : s.octave != null && Number(b.dataset.v) === s.octave);
   for (const b of $('oStrict').children) b.classList.toggle('on', b.dataset.v === s.strictness);
   $('oTolNote').textContent = `Score counts a note as on pitch within ${stepPct(tol)} (${STRICTNESS[s.strictness].label}). ` +
     'It tightens on its own as you get more accurate. The pitch line and the breakdown are always exact.';
@@ -406,7 +407,9 @@ export const practiceScreen = {
       const v = e.target.dataset && e.target.dataset.v; if (v == null) return;
       const wasRunning = state !== 'idle';
       stopSound(); state = 'idle'; if (mic.on) mic.stop();
-      store.setSetting('octave', Number(v)); loadSong(Number(v)); resetRun(); renderOptions();
+      const oct = v === 'auto' ? null : Number(v);
+      store.setSetting('octave', oct); loadSong(oct ?? bestOctave(rawSong, store.get().range)); resetRun(); renderOptions();
+      if (oct == null) toast(`Auto: ${song.transpose === -12 ? 'an octave down' : song.transpose === 12 ? 'an octave up' : 'as written'}, to suit your range`);
       $('pPlay').textContent = 'Start';
       if (wasRunning) showMsg('Octave changed. Tap Start to sing with the new notes.', [['Start', () => { $('pMsg').hidden = true; hidePanels(); start(part.from); }, 'primary']]);
     });

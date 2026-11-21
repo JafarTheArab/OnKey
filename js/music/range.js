@@ -60,13 +60,16 @@ export function slideExtent(frames) {
   return { low: m[Math.floor(m.length * 0.05)], high: m[Math.ceil(m.length * 0.95) - 1] };
 }
 
-// Typical comfortable ranges, by where the middle of your range sits
-const TYPES = [
-  [50.5, 'bass'], [55, 'baritone'], [59, 'tenor'], [63.5, 'alto'], [67, 'mezzo-soprano'], [Infinity, 'soprano'],
-];
+/**
+ * Rough voice type from the comfortable range (a guide only: real voice types also depend on tone
+ * and where the voice changes gear). The low end tells a man's voice from a woman's (a high top note
+ * doesn't make a man an alto); then the top of the comfortable range sets the type, the way choirs do:
+ *   men:   comfortable up to about A4 or higher = tenor, up to about E4 = baritone, lower = bass
+ *   women: comfortable up to about A5 or higher = soprano, up to about E5 = mezzo-soprano, lower = alto
+ */
 export function voiceType(low, high) {
-  const mid = (low + high) / 2;
-  return TYPES.find(([lim]) => mid < lim)[1];
+  if (low <= 52) return high >= 69 ? 'tenor' : high >= 63 ? 'baritone' : 'bass';  // low end E3 or below
+  return high >= 81 ? 'soprano' : high >= 75 ? 'mezzo-soprano' : 'alto';
 }
 
 /** "about A2 to E4, a baritone range" (the comfortable range) */

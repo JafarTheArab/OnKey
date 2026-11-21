@@ -22,6 +22,14 @@ The user is not a developer: plain language, exact taps, no jargon.
 - **Then Stage 1b**: generated harmony (3rd above/below, in key), fit-my-voice, "hear my part",
   layered playback. Ask the user to approve a soundfont/synth library before 1b.
 - Stage 1 was estimated at 2-3 sessions; check in after 1a.
+- **User's wish list for later (2026-11-21), agreed, not scheduled yet:** (1) "Voice qualities": on-device
+  description of his tone: breathiness (harmonics vs noise), brightness/"brass"/shrillness (energy around
+  2-4 kHz), depth (strength of low harmonics), steadiness and vibrato. Be honest: the iPhone mic, distance
+  and room colour these; strain can't be detected, only signs. Proposed as its own stage after Stage 3,
+  with steadiness/breathiness pieces folded into the Stage 2 breath lessons. (2) "Does this song fit my
+  voice": compare an imported song's melody range to his comfortable range (Stage 2 import). Artist
+  look-alike suggestions are NOT feasible honestly (no reference voices; no scraping) - explained to him.
+  His priority order is unchanged: holding his part among other voices first (Stage 1b).
 
 ## Code map
 - `js/audio/pitch.js`: YIN + `PitchTracker` (adaptive noise gate, hysteresis while holding a note,
@@ -60,6 +68,10 @@ The user is not a developer: plain language, exact taps, no jargon.
   REACH (anything hit) apart from COMFORTABLE (holds >= 1.8 s with little wander/shake, see isSteadyHold),
   and the result screen (also Home › Adjust) has −/+ for the comfortable low/high. He likes singing high;
   don't call his high notes wrong, just keep songs inside the comfortable range.
+- 2026-11-21: his comfortable range B2 to C5 (says C5 is easy to hold, he likes singing high) = "tenor".
+  Voice type now: low end <= E3 means a man's voice; then the comfortable top picks tenor/baritone/bass.
+  Octave option has "Auto" (default, from the range); a manual Down/As written/Up overrides it.
+  He likes Teddy Swims' songs (fit his voice).
 - 282 ms timing delay measured twice with his Sony Bluetooth headphones (consistent).
 - A TV or other voices nearby confuse detection (they're pitched too). "Learn the room" is a future idea.
 
