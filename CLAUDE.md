@@ -19,8 +19,19 @@ The user is not a developer: plain language, exact taps, no jargon.
   as you improve, exact breakdown (overall lean, long-note drift, after jumps, high/low notes, scoops, misses,
   hardest/strongest line, note-by-note cents). Song: Amazing Grace, 3 verses. Octave down/as written/up is
   already in Options (default picked from the range). Guide melody is a simple built-in synth (no library).
-- **Next: Stage 1b** (user OK'd going stage by stage; 'license' = free open-source terms, he won't pay for anything): generated harmony (3rd above/below, in key), fit-my-voice, "hear my part",
-  layered playback. Ask the user to approve a soundfont/synth library before 1b.
+- **Stage 1b: built 2026-11-22, waiting for the user to try it on the iPhone** (don't start Stage 2 until confirmed).
+  Sounds: Fluid R3 piano / Voice Oohs (your guide) / Choir Aahs (other voices), every 3rd note, in `sounds/`
+  (CC BY 3.0, credit in sounds/CREDITS.md and on the home screen); own player `js/audio/sampler.js`
+  (crossfades long voice notes). User approved option A (Fluid + own player) 2026-11-22.
+  Your part: Melody / Harmony above / Harmony below (diatonic 3rds in key, `js/music/harmony.js`);
+  other voices = the other parts at the written octave, plus "melody as written (like the leader)" when you
+  sing the melody in another octave. Piano accompaniment from chord symbols (`js/music/accomp.js`; song
+  files have `chords`). Fit my voice = whole song moves key (bestShift over ±12). Octave Auto/Down/Written/Up
+  moves only your part. Options: your part sung for you / other voices / piano toggles. "Hear my part": one
+  pass per step (sung for you -> on your own -> + one voice -> + all voices), moves on at >= 60 or after 2 tries.
+  History is kept per part (store.song('amazing-grace:below')).
+- Stage 2 next after 1b is confirmed (songs, MIDI import, lessons, tools). Imported MIDI harmony parts plug into
+  `others`/part choice.
 - Stage 1 was estimated at 2-3 sessions; check in after 1a.
 - **User's wish list for later (2026-11-21), agreed, not scheduled yet:** (1) "Voice qualities": on-device
   description of his tone: breathiness (harmonics vs noise), brightness/"brass"/shrillness (energy around
@@ -42,6 +53,7 @@ The user is not a developer: plain language, exact taps, no jargon.
 - `js/screens/practice.js`: practice screen. Timing = list of anchors mapping engine time -> song beats
   (new anchor on speed change or repeat). Display/scoring use engine time minus the measured delay.
 - `js/screens/range.js`, `timing.js`, `check.js` (the Step 0 mic check).
+- `js/audio/sampler.js` (recorded sounds), `js/music/harmony.js` (3rds in key, keys, bestShift), `js/music/accomp.js` (piano).
 - `js/practice/scoring.js` (pure: per-note judging on the steady middle, octave-folded score, findings),
   `js/practice/sounds.js` (click + guide voice). `js/music/song.js` (prepare/transposition/count-in),
   `js/music/range.js` (holds, voice type), `js/music/notes.js`. `js/songs/amazing-grace.js` (PD, own arrangement).

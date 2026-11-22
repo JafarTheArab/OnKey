@@ -31,7 +31,7 @@ function renderHome() {
   const prog = store.song(song.id);
   const prep = prepareSong(song);
   $('homeSongTitle').textContent = song.title;
-  $('homeCredit').textContent = song.credit;
+  $('homeCredit').textContent = song.credit + ' Piano and voice sounds: Fluid R3 by Frank Wen (CC BY 3.0).';
   const last = prog.runs[prog.runs.length - 1];
   $('homeSongInfo').textContent = `3 verses · ${song.beatsPerBar}/4 time` +
     (last ? ` · last score ${last.score}` : '') + (prog.best != null ? ` · best ${prog.best}` : '');

@@ -170,3 +170,8 @@ body {
 .adj-label { width: 64px; color: var(--muted); }
 .adjust .btn { min-width: 40px; font-size: 18px; }
 .toast { z-index: 5; }
+.dim { opacity: .4; }
+.count small.step { color: var(--voice); font-size: 14px; }
+.mic-badge { white-space: nowrap; flex: none; }
+.mic-badge .micname { display: inline-block; max-width: 150px; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
+.p-title { flex: 1 1 auto; }

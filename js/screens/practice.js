@@ -7,9 +7,11 @@
 // lines up with the notes you were answering.
 import { Mic, preferPhoneMic, showMicBadge } from '../audio/mic.js';
 import { midiName, isNatural, stepPct, offWords } from '../music/notes.js';
-import { prepareSong, countInBeats, isDownbeat, lineLabel, bestOctave } from '../music/song.js';
+import { prepareSong, countInBeats, isDownbeat, lineLabel, bestOctave, partMidis, PART_LABELS } from '../music/song.js';
+import { bestShift, KEY_SHIFTS } from '../music/harmony.js';
 import { evaluateNote, noteCredit, summarize, tolerance, troubleLine, STRICTNESS } from '../practice/scoring.js';
 import { makeBus, click, guideNote } from '../practice/sounds.js';
+import * as sampler from '../audio/sampler.js';
 import { store } from '../store.js';
 
 const $ = (id) => document.getElementById(id);
@@ -31,6 +33,30 @@ let noteMark = new Map();    // note index -> 'ok' | 'near' | 'off' | 'miss' (la
 let lineDone = new Set(), passScores = [], tol = 30, endedAt = null, toastTimer = null;
 let headless = false;        // true when no earbuds seem connected (guide may leak into the mic)
 let visible = false, displayBeat = null, displayAnchor = null;
+let sampled = false;         // recorded sounds ready for this session (otherwise simple built-in tones)
+
+// "Hear my part": one time through the chosen part per step; moves on when you hold your line
+let hearMode = false, hearStep = 0, hearTries = 0, stepOfPass = new Map(), shownStep = '';
+function hearSteps() {
+  const first = song.others[0];
+  return [
+    { label: 'Your part, sung for you', guide: true, others: 0 },
+    { label: 'On your own (just the piano)', guide: false, others: 0 },
+    ...(first ? [{ label: `With ${first.label.toLowerCase()}`, guide: false, others: 1 }] : []),
+    ...(song.others.length > 1 ? [{ label: 'With all the other voices', guide: false, others: song.others.length }] : []),
+  ];
+}
+/** What you hear during a pass: your guide voice, how many other voices, the piano. */
+function layersFor(a, commit = false) {
+  const s = store.settings();
+  if (!hearMode) return { guide: s.guide, others: s.othersOn ? song.others.length : 0, piano: s.instruments };
+  if (!a) { const st = hearSteps()[Math.min(hearStep, hearSteps().length - 1)]; return { ...st, piano: true, step: hearSteps().indexOf(st) }; }
+  // A pass's step is fixed when its music starts (after the count-in), so the previous time through
+  // has been scored by then
+  if (commit && !stepOfPass.has(a.pass)) stepOfPass.set(a.pass, hearStep);
+  const st = hearSteps()[Math.min(stepOfPass.get(a.pass) ?? hearStep, hearSteps().length - 1)];
+  return { guide: st.guide, others: st.others, piano: true, label: st.label, step: hearSteps().indexOf(st) };
+}
 
 const mic = new Mic({
   onFrame(r) {
@@ -84,7 +110,7 @@ function scheduleTick() {
     scheduleRange(ac, a, sched.beat, upTo);
     sched.beat = upTo;
     if (target < end) break;
-    if (repeat) {
+    if (repeat || hearMode) {
       const na = newPassAnchor(ctOf(a, end) + 0.15, partStart());
       anchors.push(na);
       sched = { a: na, beat: na.beat };
@@ -97,19 +123,33 @@ function scheduleRange(ac, a, b0, b1) {
   if (b1 <= b0) return;
   if (a.refMidi != null && b0 <= a.beat && a.beat < b1 && a.songFrom > a.beat) {
     // Starting note, played softly during the count-in so you know where to come in
-    guideNote(ac, bus, ctOf(a, a.beat), Math.min(2, a.songFrom - a.beat - 1) / a.rate, a.refMidi, 0.8);
+    voice(ac, 'oohs', a.refMidi, ctOf(a, a.beat), Math.min(2, a.songFrom - a.beat - 1) / a.rate, 0.8);
   }
   for (let k = Math.ceil(b0 - 1e-9); k < b1; k++) {
     const inCount = k < a.songFrom;
     if (inCount || s.metronome) click(ac, bus, ctOf(a, k), isDownbeat(song, k), inCount ? 1 : 0.6);
   }
-  if (s.guide) {
-    for (const n of song.notes) {
-      if (n.beat >= b0 && n.beat < b1 && n.beat >= a.songFrom && n.beat < partEnd()) {
-        guideNote(ac, bus, ctOf(a, n.beat), Math.max(0.08, n.dur / a.rate - 0.03), n.midi);
-      }
-    }
+  const L = layersFor(a, b1 > a.songFrom), end = partEnd();
+  const inRange = (b) => b >= b0 && b < b1 && b >= a.songFrom && b < end;
+  const len = (beat, dur) => Math.max(0.08, (Math.min(beat + dur, end) - beat) / a.rate - 0.03);
+  if (L.piano && sampled) {
+    for (const e of song.accomp) if (inRange(e.beat)) count(a.pass, 'piano'), sampler.play(ac, bus, 'piano', e.midi, ctOf(a, e.beat), len(e.beat, e.dur), e.vel * 0.8);
   }
+  for (const n of song.notes) {
+    if (!inRange(n.beat)) continue;
+    const t = ctOf(a, n.beat), d = len(n.beat, n.dur);
+    if (L.guide) voice(ac, 'oohs', n.midi, t, d, 1);
+    for (let k = 0; k < L.others; k++) voice(ac, 'aahs', song.others[k].midis[n.i], t, d, 0.75);
+  }
+}
+
+/** A sung note: recorded voice if loaded, otherwise the simple built-in tone. */
+const playCounts = {}; // pass -> { piano, oohs, aahs } (for automated tests)
+function count(pass, inst) { const c = (playCounts[pass] = playCounts[pass] || { piano: 0, oohs: 0, aahs: 0 }); c[inst]++; }
+function voice(ac, inst, midi, t, dur, vel) {
+  if (sched) count(sched.a.pass, inst);
+  if (sampled) sampler.play(ac, bus, inst, midi, t, dur, vel);
+  else guideNote(ac, bus, t, dur, midi, vel * (inst === 'aahs' ? 0.7 : 1));
 }
 
 function setSpeed(sp, why) {
@@ -145,6 +185,15 @@ async function start(fromLine) {
   if (state !== 'starting') return; // paused meanwhile
   const ac = mic.ctx;
   bus = makeBus(ac);
+  // Recorded sounds (piano and voices) for this sound engine; fall back to simple tones if they fail
+  if (!sampler.isLoaded(ac, 'piano') || !sampler.isLoaded(ac, 'oohs') || !sampler.isLoaded(ac, 'aahs')) {
+    toast('Loading sounds…', 4000);
+    try {
+      await Promise.race([sampler.load(ac, ['piano', 'oohs', 'aahs']), new Promise((_, rej) => setTimeout(() => rej(new Error('slow')), 8000))]);
+      sampled = true; $('pToast').hidden = true;
+    } catch (_) { sampled = false; toast('Couldn’t load the piano and voice sounds, so OnKey is using simple tones.', 4000); }
+    if (state !== 'starting') return;
+  } else sampled = true;
   headless = !mic.hasOtherMic;
   latency = store.get().latency ?? DEFAULT_LATENCY;
   // Line the start up with when the mic opened (about 1.2 s later), so it's predictable
@@ -208,6 +257,7 @@ function finish() {
 function resetRun() {
   frames = new Map(); attempts = []; evaluated = new Set(); noteMark = new Map(); lineDone = new Set();
   passScores = []; pass = 0; anchors = []; displayBeat = null;
+  hearStep = 0; hearTries = 0; stepOfPass = new Map(); shownStep = '';
   $('pLive').hidden = true; $('pLive').textContent = '';
 }
 
@@ -240,7 +290,7 @@ function evaluateTick(final = false) {
     if (sum.total) $('pLive').textContent = sum.score;
   }
   // Song (or part) over?
-  if (!repeat && !final && state === 'playing' && at.beat >= partEnd() + 0.4) finish();
+  if (!repeat && !hearMode && !final && state === 'playing' && at.beat >= partEnd() + 0.4) finish();
   if (state === 'playing') rememberLine(currentLine());
 }
 
@@ -253,16 +303,31 @@ function onLineProgress(p, n) {
   const js = attempts.filter((x) => x.pass === p && song.notes[x.i].line === l.index);
   const lineScore = js.reduce((s, x) => s + noteCredit(x.res, tol), 0) / Math.max(1, js.length);
   // Repeating a part: report each time through
-  if (repeat && l.index === part.to) {
+  if ((repeat || hearMode) && l.index === part.to) {
     const pj = attempts.filter((x) => x.pass === p);
     const sc = Math.round((100 * pj.reduce((s, x) => s + noteCredit(x.res, tol), 0)) / Math.max(1, pj.length));
     passScores.push(sc);
-    toast(`Time ${passScores.length}: ${sc}${passScores.length > 1 ? (sc > passScores[passScores.length - 2] ? ' ↑' : '') : ''}`);
+    if (hearMode) hearNext(p, sc);
+    else toast(`Time ${passScores.length}: ${sc}${passScores.length > 1 ? (sc > passScores[passScores.length - 2] ? ' ↑' : '') : ''}`);
   }
   if (!store.settings().autoSpeed) return;
   const userSpeed = store.settings().speed;
   if (lineScore < 0.5 && speed > 0.6) setSpeed(speed - 0.1, `That line was tricky: slowing to ${Math.round((speed - 0.1) * 100)}%`);
   else if (lineScore > 0.85 && speed < userSpeed) setSpeed(Math.min(userSpeed, speed + 0.05), `Nice! Back up to ${Math.round(Math.min(userSpeed, speed + 0.05) * 100)}%`);
+}
+
+/** Hear my part: move to the next step once you've held your line (or after two tries). */
+function hearNext(p, sc) {
+  const steps = hearSteps(), cur = stepOfPass.get(p) ?? hearStep, lastStep = steps.length - 1;
+  if (sc >= 60 || hearTries >= 1 || cur === 0) {
+    hearTries = 0;
+    if (cur >= lastStep) { toast(`${sc}: you held your part with all the voices! Keep going, or tap Done.`, 4000); return; }
+    hearStep = cur + 1;
+    toast(`${sc}${cur === 0 ? '' : ' ✓'} · Next: ${steps[hearStep].label}`, 3500);
+  } else {
+    hearTries++;
+    toast(`${sc}: let’s do that step once more`, 3500);
+  }
 }
 
 // ---------- results ----------
@@ -284,7 +349,8 @@ function showResults() {
 
   $('rScore').textContent = sum.score;
   $('rScoreLabel').innerHTML = `${sum.onPitch} of ${sum.total} notes on pitch<br>(on pitch = within ${stepPct(tol)})` +
-    (passScores.length > 1 ? `<br>each time: ${passScores.join(', ')}` : '');
+    (passScores.length > 1 ? `<br>each time: ${passScores.join(', ')}` : '') +
+    (song.part !== 'melody' ? `<br>part: ${PART_LABELS[song.part].toLowerCase()}` : '');
   const ul = $('rFindings'); ul.innerHTML = '';
   for (const f of sum.findings) {
     const li = document.createElement('li');
@@ -353,7 +419,12 @@ function renderOptions() {
   sel.value = `${part.from}-${part.to}`;
   if (sel.selectedIndex < 0) { sel.add(new Option(partName(part.from, part.to), `${part.from}-${part.to}`)); sel.value = `${part.from}-${part.to}`; }
   const tog = (id, on) => $(id).classList.toggle('on', !!on);
-  tog('oRepeat', repeat); tog('oGuide', s.guide); tog('oMetro', s.metronome); tog('oNames', s.names); tog('oAuto', s.autoSpeed);
+  tog('oRepeat', repeat || hearMode); tog('oGuide', s.guide); tog('oMetro', s.metronome); tog('oNames', s.names); tog('oAuto', s.autoSpeed);
+  tog('oOthers', s.othersOn); tog('oPiano', s.instruments); tog('oFit', s.fit); tog('oHear', hearMode);
+  for (const b of $('oPartSel').children) b.classList.toggle('on', b.dataset.v === (s.part || 'melody'));
+  $('oOctave').classList.toggle('dim', !!s.fit);
+  $('oFitNote').textContent = s.fit ? whereNotes() : '';
+  $('oVoicesRow').classList.toggle('dim', hearMode);
   // Auto = picked from your comfortable range (the default); otherwise the octave you chose
   for (const b of $('oOctave').children) b.classList.toggle('on', b.dataset.v === 'auto' ? s.octave == null : s.octave != null && Number(b.dataset.v) === s.octave);
   for (const b of $('oStrict').children) b.classList.toggle('on', b.dataset.v === s.strictness);
@@ -362,10 +433,47 @@ function renderOptions() {
 }
 function hidePanels() { $('pOptions').hidden = true; $('pResults').hidden = true; }
 
-function loadSong(octave) {
-  song = prepareSong(rawSong, { transpose: octave });
+/** Build the song for your chosen part, octave and key. */
+function loadSong() {
+  const s = store.settings(), r = store.get().range, p = s.part || 'melody';
+  let keyShift = 0, transpose = 0;
+  if (s.fit) keyShift = bestShift(partMidis(rawSong, p), r, KEY_SHIFTS);   // Fit my voice: the whole song moves
+  else transpose = s.octave ?? bestOctave(rawSong, r, p);                   // only your part moves by octaves
+  song = prepareSong(rawSong, { part: p, keyShift, transpose });
+  prog = store.song(rawSong.id + (p === 'melody' ? '' : ':' + p)); // separate history for each part
+  tol = tolerance(s.strictness, prog.runs.map((x) => x.avgAbs));
+}
+
+/** Describe where the notes sit, for the start message. */
+function whereNotes() {
   const s = store.settings();
-  tol = tolerance(s.strictness, prog.runs.map((r) => r.avgAbs));
+  const who = song.part === 'melody' ? 'the melody' : `the ${PART_LABELS[song.part].toLowerCase()} (${song.part === 'above' ? 'a third above' : 'a third below'} the melody)`;
+  if (s.fit) {
+    const k = song.keyShift;
+    const how = k === 0 ? 'already in a good key for your voice' : k % 12 === 0 ? `with the song moved an octave ${k < 0 ? 'down' : 'up'} to fit your voice`
+      : `with the song moved ${k < 0 ? 'down' : 'up'} to ${song.keyLabel} to fit your voice`;
+    return `You’re singing ${who}, ${how}.`;
+  }
+  const oct = song.transpose === -12 ? 'an octave lower than written' : song.transpose === 12 ? 'an octave higher than written' : 'as written';
+  return `You’re singing ${who}, ${oct}${store.get().range && s.octave == null ? ', to suit your range' : ''}.`;
+}
+
+/** Something that changes the notes was switched: stop, rebuild, and offer to start again. */
+function notesChanged() {
+  stopSound(); state = 'idle'; if (mic.on) mic.stop();
+  loadSong(); resetRun(); renderOptions();
+  $('pPlay').textContent = 'Start';
+  lyricLine = -1;
+  showStartMsg();
+}
+
+function showStartMsg(startLine) {
+  showMsg([
+    `${startLine ? `Starting from “${song.lines[part.from].text}”. ` : ''}${whereNotes()} Earbuds in? Tap Start: you’ll get a count-in and your starting note.`,
+    hearMode ? 'Hear my part: first your part is sung for you, then the guide drops out, then the other voices come in one at a time while you hold your line.' : '',
+    store.get().latency == null ? 'Tip: do “Line up timing” on the home screen once with your earbuds, so your voice lines up with the music.' : '',
+    'No sound? Check the silent switch on the side of the iPhone.'].filter(Boolean),
+    [['Start', () => { $('pMsg').hidden = true; hidePanels(); resetRun(); start(part.from); }, 'primary']]);
 }
 
 function showMsg(text, buttons = []) {
@@ -403,15 +511,25 @@ export const practiceScreen = {
     $('oRepeat').addEventListener('click', () => setPart(part.from, part.to, !repeat));
     const flip = (id, key) => $(id).addEventListener('click', () => { store.setSetting(key, !store.settings()[key]); renderOptions(); });
     flip('oGuide', 'guide'); flip('oMetro', 'metronome'); flip('oNames', 'names'); flip('oAuto', 'autoSpeed');
+    flip('oOthers', 'othersOn'); flip('oPiano', 'instruments');
     $('oOctave').addEventListener('click', (e) => {
       const v = e.target.dataset && e.target.dataset.v; if (v == null) return;
-      const wasRunning = state !== 'idle';
-      stopSound(); state = 'idle'; if (mic.on) mic.stop();
       const oct = v === 'auto' ? null : Number(v);
-      store.setSetting('octave', oct); loadSong(oct ?? bestOctave(rawSong, store.get().range)); resetRun(); renderOptions();
-      if (oct == null) toast(`Auto: ${song.transpose === -12 ? 'an octave down' : song.transpose === 12 ? 'an octave up' : 'as written'}, to suit your range`);
-      $('pPlay').textContent = 'Start';
-      if (wasRunning) showMsg('Octave changed. Tap Start to sing with the new notes.', [['Start', () => { $('pMsg').hidden = true; hidePanels(); start(part.from); }, 'primary']]);
+      store.setSetting('octave', oct); store.setSetting('fit', false);
+      notesChanged();
+    });
+    $('oPartSel').addEventListener('click', (e) => {
+      const v = e.target.dataset && e.target.dataset.v; if (!v || v === (store.settings().part || 'melody')) return;
+      store.setSetting('part', v); notesChanged();
+    });
+    $('oFit').addEventListener('click', () => {
+      if (!store.get().range) { toast('Do the range test first (home screen), so OnKey knows your voice.', 3500); return; }
+      store.setSetting('fit', !store.settings().fit); notesChanged();
+    });
+    $('oHear').addEventListener('click', () => {
+      hearMode = !hearMode;
+      if (hearMode) setPart(part.from, part.to, true);
+      notesChanged();
     });
     $('oStrict').addEventListener('click', (e) => {
       const v = e.target.dataset && e.target.dataset.v; if (!v) return;
@@ -422,24 +540,17 @@ export const practiceScreen = {
     new ResizeObserver(resize).observe($('pCanvas'));
   },
   show(opts = {}) {
-    prog = store.song(rawSong.id);
     const s = store.settings();
-    const octave = s.octave ?? bestOctave(rawSong, store.get().range);
-    loadSong(octave);
+    sampler.preload(['piano', 'oohs', 'aahs']); // start downloading while you get ready
+    hearMode = !!opts.hear;
+    loadSong();
     $('pTitle').textContent = song.title;
     speed = 0; setSpeed(s.speed || 1);
     state = 'idle'; resetRun(); hidePanels();
     $('pPlay').textContent = 'Start';
     if (opts.loopLine != null) setPart(opts.loopLine, opts.loopLine, true);
-    else setPart(opts.startLine || 0, song.lines.length - 1, false);
-    const r = store.get().range;
-    showMsg([
-      `${opts.startLine ? `Starting from “${song.lines[part.from].text}”. ` : ''}` +
-      `The notes are ${song.transpose === -12 ? 'an octave lower than written' : song.transpose === 12 ? 'an octave higher than written' : 'as written'}` +
-      `${r && s.octave == null ? ', to suit your range' : ''}. Earbuds in? Tap Start: you’ll get a count-in and your starting note.`,
-      store.get().latency == null ? 'Tip: do “Line up timing” on the home screen once with your earbuds, so your voice lines up with the music.' : '',
-      'No sound? Check the silent switch on the side of the iPhone.'].filter(Boolean),
-      [['Start', () => { $('pMsg').hidden = true; resetRun(); start(part.from); }, 'primary']]);
+    else setPart(opts.startLine || 0, song.lines.length - 1, hearMode);
+    showStartMsg(opts.startLine);
     visible = true; resize(); requestAnimationFrame(draw);
   },
   hide() {
@@ -450,7 +561,8 @@ export const practiceScreen = {
   },
 };
 window.__onkeyPractice = { get attempts() { return attempts; }, get frames() { return frames; }, get song() { return song; },
-  get state() { return state; }, get anchors() { return anchors; }, get tol() { return tol; }, finish: () => finish() };
+  get state() { return state; }, get anchors() { return anchors; }, get tol() { return tol; }, finish: () => finish(),
+  get playCounts() { return playCounts; }, get sampled() { return sampled; }, get passScores() { return passScores; } };
 
 // ---------- drawing ----------
 function resize() {
@@ -477,7 +589,9 @@ function draw() {
 
   // Vertical scale: the song's notes plus a little room
   const r = store.get().range;
-  const lo = song.low - 3, hi = Math.max(song.high + 3, lo + 14);
+  let lo = song.low - 3, hi = Math.max(song.high + 3, lo + 14);
+  const Lv = layersFor(a);
+  for (let k = 0; k < (hearMode ? song.others.length : Lv.others); k++) { const ms = song.others[k].midis; lo = Math.min(lo, Math.min(...ms) - 2); hi = Math.max(hi, Math.max(...ms) + 2); }
   const LEFT = 34, nowX = LEFT + (W - LEFT) * NOW_X;
   const pxPerBeat = (W - nowX) / (VIEW_AHEAD * rate);
   const y = (m) => H - 8 - ((m - lo) / (hi - lo)) * (H - 16);
@@ -495,7 +609,7 @@ function draw() {
     const isC = ((m % 12) + 12) % 12 === 0;
     g.strokeStyle = isC ? '#33415f' : isNatural(m) ? '#1e2840' : '#161e31';
     g.lineWidth = 1; g.beginPath(); g.moveTo(LEFT, y(m)); g.lineTo(W, y(m)); g.stroke();
-    if (isNatural(m)) { g.fillStyle = isC ? '#c6d0e6' : '#6f7b96'; g.fillText(midiName(m), 3, y(m)); }
+    if (isNatural(m) && (rowH >= 11 || [0, 4, 7].includes(((m % 12) + 12) % 12))) { g.fillStyle = isC ? '#c6d0e6' : '#6f7b96'; g.fillText(midiName(m), 3, y(m)); }
   }
   // Bar lines
   g.strokeStyle = '#1b2438';
@@ -509,6 +623,27 @@ function draw() {
   const ps = x(partStart()), pe = x(partEnd());
   if (ps > LEFT) g.fillRect(LEFT, 0, ps - LEFT, H);
   if (pe < W) g.fillRect(Math.max(LEFT, pe), 0, W - Math.max(LEFT, pe), H);
+
+  // Other voices you can hear: faint outlines, so you can see where they go
+  const L = layersFor(a);
+  if (L.others) {
+    g.strokeStyle = 'rgba(200,210,235,.28)'; g.lineWidth = 1.5;
+    for (let k = 0; k < L.others; k++) {
+      const o = song.others[k];
+      for (const n of song.notes) {
+        const x0 = x(n.beat), x1 = x(n.end), m = o.midis[n.i];
+        if (x1 < LEFT || x0 > W || m < lo - 1 || m > hi + 1) continue;
+        const h = Math.max(6, rowH * 0.6);
+        roundRect(g, Math.max(LEFT, x0) + 1, y(m) - h / 2, Math.max(2, x1 - Math.max(LEFT, x0) - 2), h, 3);
+        g.stroke();
+      }
+    }
+  }
+  // Hear my part: which step you're on
+  if (hearMode) {
+    const lbl = `· Hear my part, step ${(L.step ?? 0) + 1} of ${hearSteps().length}: ${L.label}`;
+    if (lbl !== shownStep) { shownStep = lbl; $('pPart').textContent = lbl; }
+  }
 
   // Target bars
   const target = css('--target');
@@ -527,6 +662,13 @@ function draw() {
       g.fillText(midiName(n.midi), Math.max(LEFT, x0) + 5, y(n.midi) + 0.5);
     }
     g.globalAlpha = 1;
+  }
+
+  // Hear my part: the step, in the corner of the graph too (the title bar can be short on space)
+  if (hearMode && L.label) {
+    g.font = 'bold 13px -apple-system, sans-serif'; g.fillStyle = '#ffd23f'; g.textBaseline = 'top';
+    g.fillText(`Step ${(L.step ?? 0) + 1} of ${hearSteps().length}: ${L.label}`, LEFT + 8, 6);
+    g.textBaseline = 'middle';
   }
 
   // Now line
@@ -576,7 +718,8 @@ function draw() {
   if (state === 'playing' && a && beat < a.songFrom) {
     const left = Math.ceil(a.songFrom - beat);
     const first = song.notes.find((n) => n.beat >= a.songFrom);
-    cnt.innerHTML = `${left}<small>starts on ${first ? midiName(first.midi) : ''}</small>`;
+    cnt.innerHTML = `${left}<small>starts on ${first ? midiName(first.midi) : ''}</small>` +
+      (hearMode && L.label ? `<small class="step">${L.label}</small>` : '');
     cnt.hidden = false;
   } else cnt.hidden = true;
 

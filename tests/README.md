@@ -16,3 +16,7 @@ Stage 1a (server running on 8765; run `timing-e2e` first, since the practice tes
 - `node tests/loop-e2e.cjs`: repeats one line; flat the first time, on pitch the second; each time is scored.
 - `node tests/speed-e2e.cjs`: speed buttons mid-song and auto speed slowing down.
 - `node tests/mic-default.cjs`: an old saved "headphones mic" choice + Bluetooth connected: practice still uses the iPhone mic, the badge says "iPhone mic ✓", Done stops the mic and shows the score.
+
+Stage 1b:
+- `node tests/harmony.test.mjs`: harmony a third above/below stays in key, other voices (incl. "melody as written" when you sing an octave down), piano chords, Fit my voice keeps every note in range.
+- `node tests/hear-e2e.cjs`: Hear my part, singing the harmony below on one line: step 1 your part sung + piano, step 2 piano only, step 3 + one voice, step 4 + all voices; recorded sounds load.

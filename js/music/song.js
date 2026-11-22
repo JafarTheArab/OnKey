@@ -1,16 +1,40 @@
 // Song helpers: turn song data into notes with pitches, words and lines. No DOM.
 import { nameToMidi } from './notes.js';
+import { diatonicShift, HARMONIES, keyName, bestShift, OCTAVE_SHIFTS } from './harmony.js';
+import { accompaniment } from './accomp.js';
+
+export const PART_LABELS = { melody: 'Melody', ...Object.fromEntries(HARMONIES.map((h) => [h.id, h.label])) };
+
+/** The written notes (MIDI) of one part: 'melody', or a harmony made from it in the song's key. */
+export function partMidis(song, part = 'melody') {
+  const base = song.notes.map((n) => nameToMidi(n.name));
+  if (part === 'melody') return base;
+  const h = HARMONIES.find((x) => x.id === part);
+  return base.map((m) => diatonicShift(m, h.steps, song.key));
+}
 
 /**
  * Prepare a song for practice.
- * transpose: semitones to shift every note (e.g. -12 = an octave down).
- * Returns { ...song, notes: [{ i, beat, dur, end, midi, syl, word, line }], lines: [{ ..., end, lastNote, text }] }
+ * part: which line is yours ('melody', 'above', 'below').
+ * keyShift: semitones the whole song moves (Fit my voice); transpose: extra shift of YOUR part only
+ * (the octave option: -12 = you sing an octave down while the others stay put).
+ * Returns { ...song, notes (your part): [{ i, beat, dur, end, midi, syl, word, line }],
+ *   others: [{ id, label, midis }] (the other voices), accomp: piano events, lines, keyLabel, ... }
  */
-export function prepareSong(song, { transpose = 0 } = {}) {
+export function prepareSong(song, { part = 'melody', keyShift = 0, transpose = 0 } = {}) {
+  const mine = partMidis(song, part);
   const notes = song.notes.map((n, i) => ({
     i, beat: n.beat, dur: n.dur, end: n.beat + n.dur,
-    midi: nameToMidi(n.name) + transpose, syl: n.syl, word: '', line: 0,
+    midi: mine[i] + keyShift + transpose, syl: n.syl, word: '', line: 0,
   }));
+  // The other voices, where the rest of the group would sing them
+  const others = ['melody', ...HARMONIES.map((h) => h.id)].filter((id) => id !== part)
+    .map((id) => ({ id, label: PART_LABELS[id], midis: partMidis(song, id).map((m) => m + keyShift) }));
+  // Singing the melody in another octave: the "leader" sings it as written
+  if (part === 'melody' && transpose) {
+    others.unshift({ id: 'lead', label: 'Melody as written (like the leader)', midis: partMidis(song).map((m) => m + keyShift) });
+  }
+  const accomp = accompaniment(song.chords || [], { beatsPerBar: song.beatsPerBar, keyShift });
   // Whole words for each syllable (for messages like "on 'grace'")
   let wordStart = 0;
   notes.forEach((n, i) => {
@@ -34,7 +58,8 @@ export function prepareSong(song, { transpose = 0 } = {}) {
     return { ...l, index: k, end: notes[lastNote].end, lastNote, text };
   });
   const midis = notes.map((n) => n.midi);
-  return { ...song, notes, lines, low: Math.min(...midis), high: Math.max(...midis), transpose };
+  return { ...song, notes, lines, others, accomp, part, keyShift, transpose,
+    keyLabel: keyName(song.key, keyShift), low: Math.min(...midis), high: Math.max(...midis) };
 }
 
 /** Count-in length (beats) so the clicks start on a downbeat and the music starts at `beat`. */
@@ -49,19 +74,7 @@ export const isDownbeat = (song, beat) => (((beat - song.pickup) % song.beatsPer
 /** Short label for a line, e.g. "Verse 1, line 3". */
 export const lineLabel = (l) => `Verse ${l.verse}, line ${l.lineInVerse}`;
 
-/** Pick the octave shift (-12, 0, +12) that best fits a sung range { low, high } (MIDI numbers). */
-export function bestOctave(song, range) {
-  if (!range) return 0;
-  const midis = song.notes.map((n) => nameToMidi(n.name));
-  let best = 0, bestCost = Infinity;
-  const songMid = (Math.min(...midis) + Math.max(...midis)) / 2;
-  const aim = (range.low + range.high) / 2 - 1; // the middle of your range, a little low
-  for (const shift of [0, -12, 12]) {
-    // Notes outside your comfortable range cost the most (above it double: straining up is worse
-    // than a low note); after that, prefer the octave closest to the middle of your range
-    const out = midis.reduce((s, m) => s + Math.max(0, range.low - (m + shift), 2 * ((m + shift) - range.high)), 0);
-    const cost = out * 10 + Math.abs(songMid + shift - aim);
-    if (cost < bestCost - 1e-9) { bestCost = cost; best = shift; }
-  }
-  return best;
+/** Pick the octave shift (-12, 0, +12) that best fits a comfortable range { low, high }. */
+export function bestOctave(song, range, part = 'melody') {
+  return bestShift(partMidis(song, part), range, OCTAVE_SHIFTS);
 }

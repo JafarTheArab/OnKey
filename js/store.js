@@ -3,7 +3,8 @@ const KEY = 'onkey.v1';
 const DEFAULTS = {
   range: null,        // { low, high, reachLow, reachHigh, date }
   latency: null,      // seconds between a sound playing and OnKey hearing you answer it
-  settings: { strictness: 'normal', metronome: false, guide: true, names: true, autoSpeed: false, speed: 1, octave: null },
+  settings: { strictness: 'normal', metronome: false, guide: true, names: true, autoSpeed: false, speed: 1, octave: null,
+    part: 'melody', fit: false, othersOn: false, instruments: true },
   songs: {},          // id -> { runs: [{ date, score, avgAbs }], noteHist: { i: [credits] }, lastLine, best }
 };
 

@@ -20,10 +20,19 @@ const VERSES = [
   'Through ma- ny dan- gers, toils and snares, | I have al- read- y come; | ’Tis grace hath brought me safe thus far, | And grace will lead me home.',
 ];
 
+// Chords for one verse, one per bar (our own simple arrangement)
+const BAR_CHORDS = ['G', 'G', 'C', 'G', 'G', 'Em', 'D', 'D', 'G', 'G7', 'C', 'G', 'Em', 'D', 'G', 'G'];
+
 function build() {
-  const notes = [], lines = [];
+  const notes = [], lines = [], chords = [];
   let beat = 0;
   VERSES.forEach((text, v) => {
+    const v0 = beat, last0 = v === VERSES.length - 1;
+    BAR_CHORDS.forEach((sym, k) => {
+      if (last0 && k === 15) return; // folded into the final chord below
+      const fin = last0 && k === 14;
+      chords.push({ beat: v0 + 1 + k * 3, dur: fin ? 6 : 3, sym, last: fin });
+    });
     const syl = text.replace(/\|/g, ' ').split(/\s+/).filter(Boolean);
     const last = v === VERSES.length - 1;
     TUNE.forEach(([dur, name, slot], i) => {
@@ -35,10 +44,10 @@ function build() {
       beat += d;
     });
   });
-  return { notes, lines, length: beat };
+  return { notes, lines, chords, length: beat };
 }
 
-const { notes, lines, length } = build();
+const { notes, lines, chords, length } = build();
 
 export default {
   id: 'amazing-grace',
@@ -50,5 +59,6 @@ export default {
   key: { tonic: 'G', mode: 'major' },
   notes,              // { beat, dur, name, syl }
   lines,              // { start, firstNote, verse, lineInVerse }
+  chords,             // { beat, dur, sym, last? } for the piano
   length,
 };
