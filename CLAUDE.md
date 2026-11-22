@@ -12,14 +12,14 @@ The user is not a developer: plain language, exact taps, no jargon.
 ## Status
 - **Step 0: done and confirmed on the user's iPhone** (2026-11-08). Pitch check screen works with and without
   Bluetooth headphones. User approved building from scratch (AllKaraoke has no license; others too small).
-- **Stage 1a: built and published to main 2026-11-08, waiting for the user to try it on the iPhone** (don't start 1b until confirmed).
+- **Stage 1a: done and confirmed on the user's iPhone** (2026-11-22, after mic/range/octave fixes).
   Home screen, range test (auto-opens on first visit), timing check ("ta" on clicks -> delay), practice screen
   (bars, voice line, lyrics, names toggle, count-in + starting note, metronome, speed +/- and auto speed,
   part = whole/verse/line + repeat, trouble spots), forgiving score with Gentle/Normal/Strict that tightens
   as you improve, exact breakdown (overall lean, long-note drift, after jumps, high/low notes, scoops, misses,
   hardest/strongest line, note-by-note cents). Song: Amazing Grace, 3 verses. Octave down/as written/up is
   already in Options (default picked from the range). Guide melody is a simple built-in synth (no library).
-- **Then Stage 1b**: generated harmony (3rd above/below, in key), fit-my-voice, "hear my part",
+- **Next: Stage 1b** (user OK'd going stage by stage; 'license' = free open-source terms, he won't pay for anything): generated harmony (3rd above/below, in key), fit-my-voice, "hear my part",
   layered playback. Ask the user to approve a soundfont/synth library before 1b.
 - Stage 1 was estimated at 2-3 sessions; check in after 1a.
 - **User's wish list for later (2026-11-21), agreed, not scheduled yet:** (1) "Voice qualities": on-device
